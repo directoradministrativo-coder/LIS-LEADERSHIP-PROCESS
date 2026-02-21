@@ -1,17 +1,18 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import {
+  boolean,
+  int,
+  mysqlEnum,
+  mysqlTable,
+  text,
+  timestamp,
+  varchar,
+} from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
- * Extend this file with additional tables as your product grows.
- * Columns use camelCase to match both database fields and generated types.
  */
 export const users = mysqlTable("users", {
-  /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
-   */
   id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
@@ -25,4 +26,149 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+/**
+ * Procesos - cada usuario/área tiene un proceso asociado
+ */
+export const processes = mysqlTable("processes", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  processName: varchar("processName", { length: 255 }).notNull().default(""),
+  areaName: varchar("areaName", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Process = typeof processes.$inferSelect;
+export type InsertProcess = typeof processes.$inferInsert;
+
+/**
+ * Jerarquías del organigrama
+ */
+export const orgHierarchies = mysqlTable("orgHierarchies", {
+  id: int("id").autoincrement().primaryKey(),
+  processId: int("processId").notNull(),
+  name: varchar("name", { length: 100 }).notNull(), // Director, Gerente, Jefe, etc.
+  level: int("level").notNull(), // 0=Director, 1=Gerente, etc.
+  parentId: int("parentId"), // Para jerarquías personalizadas
+  isCustom: boolean("isCustom").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type OrgHierarchy = typeof orgHierarchies.$inferSelect;
+export type InsertOrgHierarchy = typeof orgHierarchies.$inferInsert;
+
+/**
+ * Colaboradores del organigrama
+ */
+export const orgCollaborators = mysqlTable("orgCollaborators", {
+  id: int("id").autoincrement().primaryKey(),
+  hierarchyId: int("hierarchyId").notNull(),
+  processId: int("processId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  position: varchar("position", { length: 255 }),
+  functionsVisible: boolean("functionsVisible").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type OrgCollaborator = typeof orgCollaborators.$inferSelect;
+export type InsertOrgCollaborator = typeof orgCollaborators.$inferInsert;
+
+/**
+ * Funciones de los colaboradores
+ */
+export const collaboratorFunctions = mysqlTable("collaboratorFunctions", {
+  id: int("id").autoincrement().primaryKey(),
+  collaboratorId: int("collaboratorId").notNull(),
+  description: text("description").notNull(),
+  order: int("order").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CollaboratorFunction = typeof collaboratorFunctions.$inferSelect;
+export type InsertCollaboratorFunction = typeof collaboratorFunctions.$inferInsert;
+
+/**
+ * KPIs del proceso
+ */
+export const kpis = mysqlTable("kpis", {
+  id: int("id").autoincrement().primaryKey(),
+  processId: int("processId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  objective: text("objective").notNull(),
+  frequency: mysqlEnum("frequency", ["dia", "semana", "mes"]).notNull(),
+  formula: text("formula").notNull(),
+  responsible: varchar("responsible", { length: 255 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type KPI = typeof kpis.$inferSelect;
+export type InsertKPI = typeof kpis.$inferInsert;
+
+/**
+ * Matriz DOFA del proceso
+ */
+export const dofaMatrix = mysqlTable("dofaMatrix", {
+  id: int("id").autoincrement().primaryKey(),
+  processId: int("processId").notNull().unique(),
+  debilidades: text("debilidades").notNull(),
+  oportunidades: text("oportunidades").notNull(),
+  fortalezas: text("fortalezas").notNull(),
+  amenazas: text("amenazas").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type DofaMatrix = typeof dofaMatrix.$inferSelect;
+export type InsertDofaMatrix = typeof dofaMatrix.$inferInsert;
+
+/**
+ * Proveedores/Clientes del proceso (tabla unificada con tipo)
+ */
+export const processInteractions = mysqlTable("processInteractions", {
+  id: int("id").autoincrement().primaryKey(),
+  processId: int("processId").notNull(),
+  type: mysqlEnum("type", ["proveedor", "cliente"]).notNull(),
+  relatedProcessName: varchar("relatedProcessName", { length: 255 }).notNull(),
+  isCustomProcess: boolean("isCustomProcess").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ProcessInteraction = typeof processInteractions.$inferSelect;
+export type InsertProcessInteraction = typeof processInteractions.$inferInsert;
+
+/**
+ * Tareas/actividades de cada interacción proveedor/cliente
+ */
+export const interactionTasks = mysqlTable("interactionTasks", {
+  id: int("id").autoincrement().primaryKey(),
+  interactionId: int("interactionId").notNull(),
+  taskActivity: text("taskActivity").notNull(),
+  documentRoute: text("documentRoute").notNull(),
+  responsibleRole: varchar("responsibleRole", { length: 255 }).notNull(),
+  ansUndefined: boolean("ansUndefined").default(false).notNull(),
+  ansNumber: int("ansNumber"), // 1-9
+  ansType: mysqlEnum("ansType", ["dias_calendario", "dias_habiles", "semanas", "meses"]),
+  ansCompliance: int("ansCompliance"), // 1-5, null si ansUndefined=true
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type InteractionTask = typeof interactionTasks.$inferSelect;
+export type InsertInteractionTask = typeof interactionTasks.$inferInsert;
+
+/**
+ * Fortalezas y oportunidades entre procesos
+ */
+export const interactionStrengths = mysqlTable("interactionStrengths", {
+  id: int("id").autoincrement().primaryKey(),
+  interactionId: int("interactionId").notNull(),
+  type: mysqlEnum("type", ["fortaleza", "oportunidad"]).notNull(),
+  description: text("description").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type InteractionStrength = typeof interactionStrengths.$inferSelect;
+export type InsertInteractionStrength = typeof interactionStrengths.$inferInsert;

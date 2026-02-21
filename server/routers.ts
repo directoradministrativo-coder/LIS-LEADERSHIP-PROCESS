@@ -1,28 +1,256 @@
+import { z } from "zod";
 import { COOKIE_NAME } from "../shared/const.js";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import * as db from "./db";
 
 export const appRouter = router({
-  // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-      return {
-        success: true,
-      } as const;
+      return { success: true } as const;
     }),
   }),
 
-  // TODO: add feature routers here, e.g.
-  // todo: router({
-  //   list: protectedProcedure.query(({ ctx }) =>
-  //     db.getUserTodos(ctx.user.id)
-  //   ),
-  // }),
+  // Processes
+  process: router({
+    getOrCreate: protectedProcedure.query(({ ctx }) => {
+      return db.getOrCreateProcess(ctx.user.id);
+    }),
+    update: protectedProcedure
+      .input(z.object({ processName: z.string().min(1).max(255), areaName: z.string().optional() }))
+      .mutation(({ ctx, input }) => {
+        return db.updateProcess(ctx.user.id, input);
+      }),
+  }),
+
+  // Organigrama - Hierarchies
+  hierarchy: router({
+    list: protectedProcedure.query(({ ctx }) => {
+      return db.getHierarchies(ctx.user.id);
+    }),
+    create: protectedProcedure
+      .input(z.object({ name: z.string().min(1).max(100), level: z.number(), parentId: z.number().optional(), isCustom: z.boolean().optional() }))
+      .mutation(({ ctx, input }) => {
+        return db.createHierarchy(ctx.user.id, input);
+      }),
+    update: protectedProcedure
+      .input(z.object({ id: z.number(), name: z.string().min(1).max(100), level: z.number().optional() }))
+      .mutation(({ input }) => {
+        return db.updateHierarchy(input.id, { name: input.name, level: input.level });
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(({ input }) => {
+        return db.deleteHierarchy(input.id);
+      }),
+  }),
+
+  // Organigrama - Collaborators
+  collaborator: router({
+    listAll: protectedProcedure.query(({ ctx }) => {
+      return db.getAllCollaborators(ctx.user.id);
+    }),
+    create: protectedProcedure
+      .input(z.object({ hierarchyId: z.number(), name: z.string().min(1).max(255), position: z.string().optional() }))
+      .mutation(({ ctx, input }) => {
+        return db.createCollaborator(ctx.user.id, input);
+      }),
+    update: protectedProcedure
+      .input(z.object({ id: z.number(), name: z.string().optional(), position: z.string().optional(), functionsVisible: z.boolean().optional() }))
+      .mutation(({ input }) => {
+        return db.updateCollaborator(input.id, input);
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(({ input }) => {
+        return db.deleteCollaborator(input.id);
+      }),
+  }),
+
+  // Collaborator Functions
+  collaboratorFunction: router({
+    list: protectedProcedure
+      .input(z.object({ collaboratorId: z.number() }))
+      .query(({ input }) => {
+        return db.getCollaboratorFunctions(input.collaboratorId);
+      }),
+    create: protectedProcedure
+      .input(z.object({ collaboratorId: z.number(), description: z.string().min(1), order: z.number().optional() }))
+      .mutation(({ input }) => {
+        return db.createCollaboratorFunction(input);
+      }),
+    update: protectedProcedure
+      .input(z.object({ id: z.number(), description: z.string().min(1) }))
+      .mutation(({ input }) => {
+        return db.updateCollaboratorFunction(input.id, input.description);
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(({ input }) => {
+        return db.deleteCollaboratorFunction(input.id);
+      }),
+  }),
+
+  // KPIs
+  kpi: router({
+    list: protectedProcedure.query(({ ctx }) => {
+      return db.getKPIs(ctx.user.id);
+    }),
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string().min(1).max(255),
+        objective: z.string().min(1),
+        frequency: z.enum(["dia", "semana", "mes"]),
+        formula: z.string().min(1),
+        responsible: z.string().min(1).max(255),
+      }))
+      .mutation(({ ctx, input }) => {
+        return db.createKPI(ctx.user.id, input);
+      }),
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().min(1).max(255).optional(),
+        objective: z.string().min(1).optional(),
+        frequency: z.enum(["dia", "semana", "mes"]).optional(),
+        formula: z.string().min(1).optional(),
+        responsible: z.string().min(1).max(255).optional(),
+      }))
+      .mutation(({ input }) => {
+        return db.updateKPI(input.id, input);
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(({ input }) => {
+        return db.deleteKPI(input.id);
+      }),
+  }),
+
+  // DOFA
+  dofa: router({
+    get: protectedProcedure.query(({ ctx }) => {
+      return db.getDofa(ctx.user.id);
+    }),
+    save: protectedProcedure
+      .input(z.object({
+        debilidades: z.array(z.string()),
+        oportunidades: z.array(z.string()),
+        fortalezas: z.array(z.string()),
+        amenazas: z.array(z.string()),
+      }))
+      .mutation(({ ctx, input }) => {
+        return db.saveDofa(ctx.user.id, input);
+      }),
+  }),
+
+  // Process Interactions (Proveedores & Clientes)
+  interaction: router({
+    list: protectedProcedure
+      .input(z.object({ type: z.enum(["proveedor", "cliente"]) }))
+      .query(({ ctx, input }) => {
+        return db.getInteractions(ctx.user.id, input.type);
+      }),
+    create: protectedProcedure
+      .input(z.object({
+        type: z.enum(["proveedor", "cliente"]),
+        relatedProcessName: z.string().min(1).max(255),
+        isCustomProcess: z.boolean().optional(),
+      }))
+      .mutation(({ ctx, input }) => {
+        return db.createInteraction(ctx.user.id, input);
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(({ input }) => {
+        return db.deleteInteraction(input.id);
+      }),
+  }),
+
+  // Interaction Tasks
+  interactionTask: router({
+    list: protectedProcedure
+      .input(z.object({ interactionId: z.number() }))
+      .query(({ input }) => {
+        return db.getInteractionTasks(input.interactionId);
+      }),
+    create: protectedProcedure
+      .input(z.object({
+        interactionId: z.number(),
+        taskActivity: z.string().min(1),
+        documentRoute: z.string().min(1),
+        responsibleRole: z.string().min(1).max(255),
+        ansUndefined: z.boolean(),
+        ansNumber: z.number().min(1).max(9).optional(),
+        ansType: z.enum(["dias_calendario", "dias_habiles", "semanas", "meses"]).optional(),
+        ansCompliance: z.number().min(1).max(5).optional(),
+      }))
+      .mutation(({ input }) => {
+        return db.createInteractionTask(input);
+      }),
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        taskActivity: z.string().min(1).optional(),
+        documentRoute: z.string().min(1).optional(),
+        responsibleRole: z.string().min(1).max(255).optional(),
+        ansUndefined: z.boolean().optional(),
+        ansNumber: z.number().min(1).max(9).optional().nullable(),
+        ansType: z.enum(["dias_calendario", "dias_habiles", "semanas", "meses"]).optional().nullable(),
+        ansCompliance: z.number().min(1).max(5).optional().nullable(),
+      }))
+      .mutation(({ input }) => {
+        return db.updateInteractionTask(input.id, input);
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(({ input }) => {
+        return db.deleteInteractionTask(input.id);
+      }),
+  }),
+
+  // Interaction Strengths (Fortalezas & Oportunidades)
+  interactionStrength: router({
+    list: protectedProcedure
+      .input(z.object({ interactionId: z.number() }))
+      .query(({ input }) => {
+        return db.getInteractionStrengths(input.interactionId);
+      }),
+    create: protectedProcedure
+      .input(z.object({
+        interactionId: z.number(),
+        type: z.enum(["fortaleza", "oportunidad"]),
+        description: z.string().min(1),
+      }))
+      .mutation(({ input }) => {
+        return db.createInteractionStrength(input);
+      }),
+    delete: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(({ input }) => {
+        return db.deleteInteractionStrength(input.id);
+      }),
+  }),
+
+  // Export data for Excel
+  export: router({
+    orgChart: protectedProcedure.query(({ ctx }) => {
+      return db.getOrgChartExportData(ctx.user.id);
+    }),
+    kpis: protectedProcedure.query(({ ctx }) => {
+      return db.getKPIsExportData(ctx.user.id);
+    }),
+    dofa: protectedProcedure.query(({ ctx }) => {
+      return db.getDofaExportData(ctx.user.id);
+    }),
+    interactions: protectedProcedure.query(({ ctx }) => {
+      return db.getInteractionsExportData(ctx.user.id);
+    }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

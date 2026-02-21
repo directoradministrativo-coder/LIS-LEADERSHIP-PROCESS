@@ -1,0 +1,279 @@
+import {
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
+  Alert, ActivityIndicator
+} from "react-native";
+import { ScreenContainer } from "@/components/screen-container";
+import { trpc } from "@/lib/trpc";
+import { useState, useEffect } from "react";
+
+const DOFA_SECTIONS = [
+  {
+    key: "debilidades" as const,
+    label: "Debilidades",
+    icon: "⚠️",
+    color: "#CC2229",
+    bgColor: "#FEF2F2",
+    borderColor: "#FECACA",
+    description: "Factores internos negativos que limitan el proceso",
+    placeholder: "Ej: Falta de automatización en el proceso de facturación",
+  },
+  {
+    key: "oportunidades" as const,
+    label: "Oportunidades",
+    icon: "💡",
+    color: "#F5A623",
+    bgColor: "#FFFBEB",
+    borderColor: "#FDE68A",
+    description: "Factores externos positivos que pueden aprovecharse",
+    placeholder: "Ej: Crecimiento del mercado de e-commerce en la región",
+  },
+  {
+    key: "fortalezas" as const,
+    label: "Fortalezas",
+    icon: "💪",
+    color: "#5CB85C",
+    bgColor: "#F0FDF4",
+    borderColor: "#BBF7D0",
+    description: "Factores internos positivos que generan ventaja",
+    placeholder: "Ej: Equipo con alta experiencia en logística internacional",
+  },
+  {
+    key: "amenazas" as const,
+    label: "Amenazas",
+    icon: "🛡",
+    color: "#1B4F9B",
+    bgColor: "#EFF6FF",
+    borderColor: "#BFDBFE",
+    description: "Factores externos negativos que representan riesgo",
+    placeholder: "Ej: Incremento en los costos de transporte internacional",
+  },
+];
+
+type DofaData = {
+  debilidades: string[];
+  oportunidades: string[];
+  fortalezas: string[];
+  amenazas: string[];
+};
+
+export default function DofaScreen() {
+  const [data, setData] = useState<DofaData>({
+    debilidades: [],
+    oportunidades: [],
+    fortalezas: [],
+    amenazas: [],
+  });
+  const [newItems, setNewItems] = useState<Record<string, string>>({
+    debilidades: "",
+    oportunidades: "",
+    fortalezas: "",
+    amenazas: "",
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  const dofaQuery = trpc.dofa.get.useQuery();
+  const saveDofa = trpc.dofa.save.useMutation({
+    onSuccess: () => {
+      dofaQuery.refetch();
+      setHasChanges(false);
+      setIsSaving(false);
+    },
+    onError: () => setIsSaving(false),
+  });
+
+  useEffect(() => {
+    if (dofaQuery.data) {
+      setData({
+        debilidades: dofaQuery.data.debilidades ?? [],
+        oportunidades: dofaQuery.data.oportunidades ?? [],
+        fortalezas: dofaQuery.data.fortalezas ?? [],
+        amenazas: dofaQuery.data.amenazas ?? [],
+      });
+    }
+  }, [dofaQuery.data]);
+
+  const handleAddItem = (section: keyof DofaData) => {
+    const text = newItems[section]?.trim();
+    if (!text) return;
+    const updated = { ...data, [section]: [...data[section], text] };
+    setData(updated);
+    setNewItems(prev => ({ ...prev, [section]: "" }));
+    setHasChanges(true);
+  };
+
+  const handleRemoveItem = (section: keyof DofaData, index: number) => {
+    const updated = { ...data, [section]: data[section].filter((_, i) => i !== index) };
+    setData(updated);
+    setHasChanges(true);
+  };
+
+  const handleSave = () => {
+    setIsSaving(true);
+    saveDofa.mutate(data);
+  };
+
+  const totalItems = Object.values(data).reduce((sum, arr) => sum + arr.length, 0);
+
+  return (
+    <ScreenContainer containerClassName="bg-background">
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <Text style={styles.headerTitle}>Análisis DOFA</Text>
+          <Text style={styles.headerSubtitle}>Diagnóstico estratégico del proceso</Text>
+        </View>
+        {hasChanges && (
+          <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={isSaving}>
+            {isSaving ? (
+              <ActivityIndicator size="small" color="#FFF" />
+            ) : (
+              <Text style={styles.saveBtnText}>Guardar</Text>
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Summary Banner */}
+      {totalItems > 0 && (
+        <View style={styles.summaryBanner}>
+          {DOFA_SECTIONS.map(section => (
+            <View key={section.key} style={styles.summaryItem}>
+              <Text style={[styles.summaryCount, { color: section.color }]}>
+                {data[section.key].length}
+              </Text>
+              <Text style={styles.summaryLabel}>{section.label}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {dofaQuery.isLoading ? (
+          <ActivityIndicator color="#CC2229" style={{ marginTop: 40 }} />
+        ) : (
+          DOFA_SECTIONS.map(section => (
+            <View key={section.key} style={[styles.sectionCard, { borderColor: section.borderColor, borderTopColor: section.color, borderTopWidth: 3 }]}>
+              {/* Section Header */}
+              <View style={[styles.sectionHeader, { backgroundColor: section.bgColor }]}>
+                <Text style={styles.sectionIcon}>{section.icon}</Text>
+                <View style={styles.sectionHeaderText}>
+                  <Text style={[styles.sectionTitle, { color: section.color }]}>{section.label}</Text>
+                  <Text style={styles.sectionDescription}>{section.description}</Text>
+                </View>
+                <View style={[styles.countBadge, { backgroundColor: section.color }]}>
+                  <Text style={styles.countBadgeText}>{data[section.key].length}</Text>
+                </View>
+              </View>
+
+              {/* Items List */}
+              <View style={styles.itemsList}>
+                {data[section.key].length === 0 ? (
+                  <Text style={styles.emptyItemsText}>Sin elementos registrados</Text>
+                ) : (
+                  data[section.key].map((item, index) => (
+                    <View key={index} style={styles.itemRow}>
+                      <View style={[styles.itemBullet, { backgroundColor: section.color }]} />
+                      <Text style={styles.itemText}>{item}</Text>
+                      <TouchableOpacity
+                        onPress={() => handleRemoveItem(section.key, index)}
+                        style={styles.removeBtn}
+                      >
+                        <Text style={styles.removeBtnText}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                )}
+              </View>
+
+              {/* Add Item Input */}
+              <View style={styles.addItemContainer}>
+                <TextInput
+                  style={[styles.addItemInput, { borderColor: section.borderColor }]}
+                  value={newItems[section.key]}
+                  onChangeText={v => setNewItems(prev => ({ ...prev, [section.key]: v }))}
+                  placeholder={section.placeholder}
+                  placeholderTextColor="#9CA3AF"
+                  multiline
+                  returnKeyType="done"
+                  onSubmitEditing={() => handleAddItem(section.key)}
+                />
+                <TouchableOpacity
+                  style={[styles.addItemBtn, { backgroundColor: section.color }]}
+                  onPress={() => handleAddItem(section.key)}
+                >
+                  <Text style={styles.addItemBtnText}>+</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))
+        )}
+
+        {/* Save Button at bottom */}
+        {hasChanges && (
+          <TouchableOpacity style={styles.bottomSaveBtn} onPress={handleSave} disabled={isSaving}>
+            {isSaving ? (
+              <ActivityIndicator size="small" color="#FFF" />
+            ) : (
+              <Text style={styles.bottomSaveBtnText}>Guardar Análisis DOFA</Text>
+            )}
+          </TouchableOpacity>
+        )}
+
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </ScreenContainer>
+  );
+}
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB", backgroundColor: "#FFFFFF",
+  },
+  headerLeft: { flex: 1 },
+  headerTitle: { fontSize: 18, fontWeight: "800", color: "#1A1A2E" },
+  headerSubtitle: { fontSize: 12, color: "#6B7280", marginTop: 2 },
+  saveBtn: { backgroundColor: "#5CB85C", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, minWidth: 80, alignItems: "center" },
+  saveBtnText: { color: "#FFF", fontWeight: "700", fontSize: 13 },
+  summaryBanner: {
+    flexDirection: "row", backgroundColor: "#FFFFFF",
+    borderBottomWidth: 1, borderBottomColor: "#E5E7EB", paddingVertical: 10,
+  },
+  summaryItem: { flex: 1, alignItems: "center" },
+  summaryCount: { fontSize: 22, fontWeight: "800" },
+  summaryLabel: { fontSize: 10, color: "#6B7280", fontWeight: "600", textTransform: "uppercase" },
+  content: { flex: 1, padding: 16 },
+  sectionCard: {
+    backgroundColor: "#FFFFFF", borderRadius: 12, marginBottom: 16,
+    borderWidth: 1, overflow: "hidden",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 3, elevation: 2,
+  },
+  sectionHeader: { flexDirection: "row", alignItems: "center", padding: 14 },
+  sectionIcon: { fontSize: 24, marginRight: 12 },
+  sectionHeaderText: { flex: 1 },
+  sectionTitle: { fontSize: 16, fontWeight: "800" },
+  sectionDescription: { fontSize: 12, color: "#6B7280", marginTop: 2, lineHeight: 17 },
+  countBadge: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  countBadgeText: { color: "#FFF", fontSize: 13, fontWeight: "700" },
+  itemsList: { paddingHorizontal: 14, paddingTop: 8, paddingBottom: 4 },
+  emptyItemsText: { fontSize: 13, color: "#9CA3AF", fontStyle: "italic", paddingVertical: 8 },
+  itemRow: { flexDirection: "row", alignItems: "flex-start", paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: "#F9FAFB" },
+  itemBullet: { width: 6, height: 6, borderRadius: 3, marginTop: 7, marginRight: 10, flexShrink: 0 },
+  itemText: { flex: 1, fontSize: 14, color: "#374151", lineHeight: 21 },
+  removeBtn: { padding: 4, marginLeft: 8 },
+  removeBtnText: { fontSize: 13, color: "#9CA3AF", fontWeight: "600" },
+  addItemContainer: { flexDirection: "row", padding: 12, gap: 8, borderTopWidth: 1, borderTopColor: "#F3F4F6" },
+  addItemInput: { flex: 1, borderWidth: 1.5, borderRadius: 8, padding: 10, fontSize: 13, color: "#1A1A2E", minHeight: 40 },
+  addItemBtn: { width: 40, height: 40, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  addItemBtnText: { color: "#FFF", fontSize: 22, fontWeight: "300", lineHeight: 28 },
+  bottomSaveBtn: {
+    backgroundColor: "#5CB85C", paddingVertical: 15, borderRadius: 12,
+    alignItems: "center", marginBottom: 16,
+    shadowColor: "#5CB85C", shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
+  },
+  bottomSaveBtnText: { color: "#FFF", fontWeight: "700", fontSize: 16 },
+});
