@@ -4,7 +4,7 @@ import {
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { trpc } from "@/lib/trpc";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { MaterialIcons } from "@expo/vector-icons";
 
@@ -205,10 +205,13 @@ function UserOrgView() {
     setFunctionsLoaded(true);
   };
 
-  // Load functions when collaborators are available
-  if (collaborators.length > 0 && !functionsLoaded) {
-    loadAllFunctions();
-  }
+  // Load functions when collaborators are available — in useEffect to avoid setState-during-render
+  useEffect(() => {
+    if (collaborators.length > 0 && !functionsLoaded) {
+      void loadAllFunctions();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collaborators.length, functionsLoaded]);
 
   const hierarchies = hierarchiesQuery.data ?? [];
   const sortedHierarchies = useMemo(() =>

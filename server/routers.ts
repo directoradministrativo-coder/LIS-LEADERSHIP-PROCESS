@@ -248,10 +248,10 @@ export const appRouter = router({
         email: z.string().email(),
         name: z.string().min(1).max(255),
         areaName: z.string().optional(),
-        role: z.enum(["user", "admin"]).optional(),
-      }))
-      .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new Error("UNAUTHORIZED");
+      role: z.enum(["user", "admin", "superadmin"]).optional(),
+      })).
+      mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
         return db.createAuthorizedUser(input);
       }),
     updateAuthorizedUser: protectedProcedure
@@ -259,10 +259,10 @@ export const appRouter = router({
         id: z.number(),
         name: z.string().min(1).max(255).optional(),
         areaName: z.string().optional(),
-        role: z.enum(["user", "admin"]).optional(),
-      }))
-      .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new Error("UNAUTHORIZED");
+      role: z.enum(["user", "admin", "superadmin"]).optional(),
+      })).
+      mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
         return db.updateAuthorizedUser(input.id, input);
       }),
     deleteAuthorizedUser: protectedProcedure
@@ -287,8 +287,11 @@ export const appRouter = router({
       // Mark as enrolled if first time
       if (!authUser.isEnrolled) {
         await db.markUserAsEnrolled(ctx.user.email);
-        // Sync role to main users table
         await db.updateAuthorizedUser(authUser.id, { isEnrolled: true, enrolledAt: new Date() });
+      }
+      // Always sync role from authorizedUsers to users table so ctx.user.role stays current
+      if (ctx.user.role !== authUser.role) {
+        await db.syncUserRole(ctx.user.id, authUser.role);
       }
       return { authorized: true, role: authUser.role, areaName: authUser.areaName };
     }),
@@ -325,9 +328,9 @@ export const appRouter = router({
     interactions: protectedProcedure.query(({ ctx }) => {
       return db.getInteractionsExportData(ctx.user.id);
     }),
-    // Admin: export all processes consolidated
+    // Admin/SuperAdmin: export all processes consolidated
     allProcesses: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new Error("UNAUTHORIZED");
+      if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
       return db.getAllProcessesData();
     }),
   }),

@@ -1,0 +1,49 @@
+{
+  "query": "SHOW TABLES;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2PdRtrWLd1DC4ZR.b592ac40996f --database koomPuwFyTypz4KywoA68k --execute SHOW TABLES;",
+  "rows": [
+    {
+      "Tables_in_koomPuwFyTypz4KywoA68k": "__drizzle_migrations"
+    },
+    {
+      "Tables_in_koomPuwFyTypz4KywoA68k": "authorizedUsers"
+    },
+    {
+      "Tables_in_koomPuwFyTypz4KywoA68k": "collaboratorFunctions"
+    },
+    {
+      "Tables_in_koomPuwFyTypz4KywoA68k": "dofaMatrix"
+    },
+    {
+      "Tables_in_koomPuwFyTypz4KywoA68k": "interactionStrengths"
+    },
+    {
+      "Tables_in_koomPuwFyTypz4KywoA68k": "interactionTasks"
+    },
+    {
+      "Tables_in_koomPuwFyTypz4KywoA68k": "kpis"
+    },
+    {
+      "Tables_in_koomPuwFyTypz4KywoA68k": "moduleObservations"
+    },
+    {
+      "Tables_in_koomPuwFyTypz4KywoA68k": "orgCollaborators"
+    },
+    {
+      "Tables_in_koomPuwFyTypz4KywoA68k": "orgHierarchies"
+    },
+    {
+      "Tables_in_koomPuwFyTypz4KywoA68k": "processInteractions"
+    },
+    {
+      "Tables_in_koomPuwFyTypz4KywoA68k": "processes"
+    },
+    {
+      "Tables_in_koomPuwFyTypz4KywoA68k": "users"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_koomPuwFyTypz4KywoA68k\n__drizzle_migrations\nauthorizedUsers\ncollaboratorFunctions\ndofaMatrix\ninteractionStrengths\ninteractionTasks\nkpis\nmoduleObservations\norgCollaborators\norgHierarchies\nprocessInteractions\nprocesses\nusers\n",
+  "stderr": "",
+  "execution_time_ms": 49
+}

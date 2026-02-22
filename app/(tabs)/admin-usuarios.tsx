@@ -7,7 +7,7 @@ import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 import { MaterialIcons } from "@expo/vector-icons";
 
-type Role = "user" | "admin";
+type Role = "user" | "admin" | "superadmin";
 
 type UserForm = {
   email: string;
@@ -28,11 +28,13 @@ function parseCSV(text: string): Array<{ email: string; name: string; areaName: 
   for (let i = start; i < lines.length; i++) {
     const cols = lines[i].split(",").map(c => c.trim().replace(/^"|"$/g, ""));
     if (cols.length >= 2 && cols[0] && cols[1]) {
+      const rawRole = cols[3]?.toLowerCase();
+      const role: Role = rawRole === "admin" ? "admin" : rawRole === "superadmin" ? "superadmin" : "user";
       results.push({
         email: cols[0],
         name: cols[1],
         areaName: cols[2] ?? "",
-        role: (cols[3] === "admin" ? "admin" : "user") as Role,
+        role,
       });
     }
   }
@@ -125,14 +127,27 @@ export default function AdminUsuariosScreen() {
     );
   };
 
+  const ROLE_LABELS: Record<Role, string> = {
+    user: "Usuario",
+    admin: "Administrador",
+    superadmin: "SuperAdmin",
+  };
+
+  const ROLE_COLORS: Record<Role, string> = {
+    user: "#1B4F9B",
+    admin: "#CC2229",
+    superadmin: "#92400E",
+  };
+
   const toggleRole = (id: number, currentRole: Role) => {
-    const newRole = currentRole === "admin" ? "user" : "admin";
+    const roles: Role[] = ["user", "admin", "superadmin"];
+    const nextRole = roles[(roles.indexOf(currentRole) + 1) % roles.length];
     Alert.alert(
       "Cambiar rol",
-      `¿Cambiar a ${newRole === "admin" ? "Administrador" : "Usuario"}?`,
+      `¿Cambiar a ${ROLE_LABELS[nextRole]}?`,
       [
         { text: "Cancelar", style: "cancel" },
-        { text: "Confirmar", onPress: () => updateUser.mutate({ id, role: newRole }) },
+        { text: "Confirmar", onPress: () => updateUser.mutate({ id, role: nextRole }) },
       ]
     );
   };
@@ -177,7 +192,7 @@ export default function AdminUsuariosScreen() {
       <View style={styles.csvHint}>
         <MaterialIcons name="info-outline" size={14} color="#6B7280" />
         <Text style={styles.csvHintText}>
-          Formato CSV: email, nombre, área, rol (user/admin)
+          Formato CSV: email, nombre, área, rol (user/admin/superadmin)
         </Text>
       </View>
 
@@ -195,7 +210,7 @@ export default function AdminUsuariosScreen() {
         </View>
         <View style={styles.statCard}>
           <Text style={[styles.statNumber, { color: "#CC2229" }]}>
-            {users.filter(u => u.role === "admin").length}
+            {users.filter(u => u.role === "admin" || u.role === "superadmin").length}
           </Text>
           <Text style={styles.statLabel}>Admins</Text>
         </View>
@@ -236,11 +251,11 @@ export default function AdminUsuariosScreen() {
                 <View style={styles.userNameRow}>
                   <Text style={styles.userName}>{item.name}</Text>
                   <TouchableOpacity
-                    style={[styles.roleBadge, { backgroundColor: item.role === "admin" ? "#CC2229" : "#1B4F9B" }]}
+                    style={[styles.roleBadge, { backgroundColor: ROLE_COLORS[(item.role as Role) ?? "user"] }]}
                     onPress={() => toggleRole(item.id, item.role as Role)}
                   >
                     <Text style={styles.roleBadgeText}>
-                      {item.role === "admin" ? "Admin" : "Usuario"}
+                      {ROLE_LABELS[(item.role as Role) ?? "user"]}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -319,19 +334,19 @@ export default function AdminUsuariosScreen() {
 
               <Text style={styles.fieldLabel}>Rol</Text>
               <View style={styles.roleSelector}>
-                {(["user", "admin"] as Role[]).map(r => (
+                {(["user", "admin", "superadmin"] as Role[]).map(r => (
                   <TouchableOpacity
                     key={r}
-                    style={[styles.roleOption, form.role === r && styles.roleOptionActive]}
+                    style={[styles.roleOption, form.role === r && { backgroundColor: ROLE_COLORS[r], borderColor: ROLE_COLORS[r] }]}
                     onPress={() => setForm(p => ({ ...p, role: r }))}
                   >
                     <MaterialIcons
-                      name={r === "admin" ? "admin-panel-settings" : "person"}
-                      size={18}
+                      name={r === "superadmin" ? "verified" : r === "admin" ? "admin-panel-settings" : "person"}
+                      size={16}
                       color={form.role === r ? "#FFFFFF" : "#6B7280"}
                     />
                     <Text style={[styles.roleOptionText, form.role === r && styles.roleOptionTextActive]}>
-                      {r === "admin" ? "Administrador" : "Usuario"}
+                      {r === "superadmin" ? "SuperAdmin" : r === "admin" ? "Admin" : "Usuario"}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -368,7 +383,7 @@ export default function AdminUsuariosScreen() {
               <View style={styles.csvFormatBox}>
                 <Text style={styles.csvFormatTitle}>📋 Formato del CSV:</Text>
                 <Text style={styles.csvFormatCode}>
-                  {"email,nombre,area,rol\njuan@lis.com.co,Juan Pérez,Logística,user\nadmin@lis.com.co,Ana García,Dirección,admin"}
+                  {"email,nombre,area,rol\njuan@lis.com.co,Juan Pérez,Logística,user\nadmin@lis.com.co,Ana García,Dirección,admin\nsuperadmin@lis.com.co,Carlos Dir,Gerencia,superadmin"}
                 </Text>
               </View>
 

@@ -505,7 +505,7 @@ export async function getAuthorizedUserByEmail(email: string) {
   return result.length > 0 ? result[0] : null;
 }
 
-export async function createAuthorizedUser(data: { email: string; name: string; areaName?: string; role?: "user" | "admin" }) {
+export async function createAuthorizedUser(data: { email: string; name: string; areaName?: string; role?: "user" | "admin" | "superadmin" }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.insert(authorizedUsers).values({
@@ -518,10 +518,16 @@ export async function createAuthorizedUser(data: { email: string; name: string; 
   return created[0];
 }
 
-export async function updateAuthorizedUser(id: number, data: Partial<{ name: string; areaName: string; role: "user" | "admin"; isEnrolled: boolean; enrolledAt: Date }>) {
+export async function updateAuthorizedUser(id: number, data: Partial<{ name: string; areaName: string; role: "user" | "admin" | "superadmin"; isEnrolled: boolean; enrolledAt: Date }>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.update(authorizedUsers).set(data).where(eq(authorizedUsers.id, id));
+}
+
+export async function syncUserRole(userId: number, role: "user" | "admin" | "superadmin") {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(users).set({ role }).where(eq(users.id, userId));
 }
 
 export async function deleteAuthorizedUser(id: number) {

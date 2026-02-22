@@ -6,12 +6,16 @@ import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState } from "react";
 import { MaterialIcons } from "@expo/vector-icons";
 import { trpc } from "@/lib/trpc";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const PROFILE_KEY = "lis_active_profile";
 
 // ─── Authorization Gate ───────────────────────────────────────────────────────
 
 function AuthorizationGate({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, loading } = useAuth();
   const [authState, setAuthState] = useState<"checking" | "authorized" | "unauthorized">("checking");
+  const [profileChecked, setProfileChecked] = useState(false);
 
   const checkAuth = trpc.auth2.checkAuthorization.useQuery(undefined, {
     enabled: isAuthenticated && !loading,
@@ -25,6 +29,20 @@ function AuthorizationGate({ children }: { children: React.ReactNode }) {
     }
     if (checkAuth.isSuccess) {
       if (checkAuth.data?.authorized) {
+        // SuperAdmin: redirect to profile selector only if no profile has been chosen yet
+        if (checkAuth.data.role === "superadmin") {
+          AsyncStorage.getItem(PROFILE_KEY).then(savedProfile => {
+            if (!savedProfile) {
+              // First time: go to profile selector
+              router.replace("/select-profile" as any);
+            } else {
+              // Already chose a profile: allow access
+              setAuthState("authorized");
+            }
+            setProfileChecked(true);
+          });
+          return;
+        }
         setAuthState("authorized");
       } else {
         setAuthState("unauthorized");
@@ -84,9 +102,26 @@ export default function TabLayout() {
   const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 8);
   const tabBarHeight = 56 + bottomPadding;
 
-  const isAdmin = (user as any)?.role === "admin";
+  const role = (user as any)?.role as string | undefined;
+  const isAdmin = role === "admin" || role === "superadmin";
 
-  if (loading || !isAuthenticated) return null;
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#FFFFFF", justifyContent: "center", alignItems: "center" }}>
+        <View style={{ flexDirection: "row", height: 6, width: "100%", position: "absolute", top: 0 }}>
+          {["#CC2229", "#F5A623", "#5CB85C", "#1B4F9B"].map(c => (
+            <View key={c} style={{ flex: 1, backgroundColor: c }} />
+          ))}
+        </View>
+        <ActivityIndicator size="large" color="#CC2229" />
+        <Text style={{ marginTop: 12, fontSize: 14, color: "#6B7280" }}>Cargando...</Text>
+      </View>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null; // router.replace('/login') is handled in AuthorizationGate
+  }
 
   return (
     <AuthorizationGate>

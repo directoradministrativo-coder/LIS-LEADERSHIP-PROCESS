@@ -5,6 +5,10 @@ import { useColors } from "@/hooks/use-colors";
 import { trpc } from "@/lib/trpc";
 import { useState, useEffect } from "react";
 import { router } from "expo-router";
+import { MaterialIcons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const PROFILE_KEY = "lis_active_profile";
 
 const MODULES = [
   { id: "organigrama", title: "Organigrama del Área", icon: "👥", description: "Estructura jerárquica del equipo", route: "/(tabs)/organigrama", color: "#1B4F9B" },
@@ -20,6 +24,23 @@ export default function HomeScreen() {
   const [processName, setProcessName] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState("");
+  const [activeProfile, setActiveProfile] = useState<"user" | "admin">("user");
+
+  const userRole = (user as any)?.role as string | undefined;
+  const isSuperAdmin = userRole === "superadmin";
+  const isAdmin = userRole === "admin" || userRole === "superadmin";
+
+  useEffect(() => {
+    AsyncStorage.getItem(PROFILE_KEY).then(p => {
+      if (p === "admin" || p === "user") setActiveProfile(p);
+    });
+  }, []);
+
+  const handleLogout = async () => {
+    // Clear saved profile so SuperAdmin sees the selector next time
+    await AsyncStorage.removeItem(PROFILE_KEY);
+    logout();
+  };
 
   const processQuery = trpc.process.getOrCreate.useQuery(undefined, {
     retry: false,
@@ -61,9 +82,36 @@ export default function HomeScreen() {
           style={styles.headerLogo}
           resizeMode="contain"
         />
-        <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
-          <Text style={styles.logoutText}>Salir</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          {/* Settings button - visible for admin and superadmin */}
+          {isAdmin && (
+            <TouchableOpacity
+              style={styles.settingsBtn}
+              onPress={() => router.push("/(tabs)/admin-usuarios" as any)}
+            >
+              <MaterialIcons name="manage-accounts" size={22} color="#1B4F9B" />
+            </TouchableOpacity>
+          )}
+          {/* Profile switcher for SuperAdmin */}
+          {isSuperAdmin && (
+            <TouchableOpacity
+              style={[styles.profileBadge, { backgroundColor: activeProfile === "admin" ? "#FEF2F2" : "#EEF2FF" }]}
+              onPress={() => router.push("/select-profile" as any)}
+            >
+              <MaterialIcons
+                name={activeProfile === "admin" ? "admin-panel-settings" : "person"}
+                size={14}
+                color={activeProfile === "admin" ? "#CC2229" : "#1B4F9B"}
+              />
+              <Text style={[styles.profileBadgeText, { color: activeProfile === "admin" ? "#CC2229" : "#1B4F9B" }]}>
+                {activeProfile === "admin" ? "Admin" : "Usuario"}
+              </Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
+            <Text style={styles.logoutText}>Salir</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -174,6 +222,35 @@ const styles = StyleSheet.create({
   headerLogo: {
     width: 120,
     height: 50,
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  settingsBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#EEF2FF",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#C7D2FE",
+  },
+  profileBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  profileBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
   },
   logoutBtn: {
     paddingHorizontal: 14,

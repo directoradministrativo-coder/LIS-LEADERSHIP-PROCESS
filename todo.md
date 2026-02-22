@@ -114,3 +114,12 @@
 - [x] Agregar campo "Observaciones" en módulo Interacciones (Proveedores/Clientes)
 - [x] Agregar campo "Observaciones" en módulo KPIs
 - [x] Agregar campo "Observaciones" en módulo DOFA
+
+## Ajustes v3 - SuperAdmin, visualización y botón de configuración
+
+- [x] Corregir pantalla en blanco / problema de indexación en web
+- [x] Agregar perfil SuperAdmin en la tabla authorizedUsers (enum: user, admin, superadmin)
+- [x] Actualizar los 2 usuarios existentes a rol superadmin
+- [x] Implementar selector de perfil en login para usuarios SuperAdmin
+- [x] Agregar botón de configuración (gestión de usuarios) visible en el header
+- [x] Asegurar que el tab Admin Usuarios sea accesible para admin y superadmin
