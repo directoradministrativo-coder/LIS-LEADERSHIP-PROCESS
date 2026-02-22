@@ -22,6 +22,7 @@ export default function ExportarScreen() {
   const isAdmin = lisRole === "admin" || lisRole === "superadmin";
 
   const [isExporting, setIsExporting] = useState(false);
+  const [exportingProcessId, setExportingProcessId] = useState<number | null>(null);
   const [exportMode, setExportMode] = useState<"individual" | "consolidated" | "selected">("individual");
   const [selectedProcessIds, setSelectedProcessIds] = useState<number[]>([]);
 
@@ -83,6 +84,35 @@ export default function ExportarScreen() {
     setSelectedProcessIds(prev =>
       prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
     );
+  };
+
+  const handleExportSingleProcess = async (processId: number) => {
+    setExportingProcessId(processId);
+    try {
+      const rawItem = (allProcessesQuery.data ?? []).find(
+        (item: any) => (item.process?.id ?? item.id) === processId
+      );
+      if (!rawItem) {
+        Alert.alert("Error", "No se encontraron datos para este proceso.");
+        return;
+      }
+      const proc = rawItem.process ?? rawItem;
+      const wb = buildExcelWorkbook(
+        { process: proc, hierarchies: rawItem.hierarchies ?? [], collaborators: rawItem.collaborators ?? [], functions: rawItem.functions ?? [] },
+        { process: proc, kpis: rawItem.kpis ?? [] },
+        { process: proc, dofa: rawItem.dofa },
+        { process: proc, interactions: rawItem.interactions ?? [] },
+        { process: proc, projects: rawItem.projects ?? [] }
+      );
+      const pName = (proc.processName ?? "Proceso").replace(/\s+/g, "_");
+      const filename = `LIS_Levantamiento_${pName}_${new Date().toISOString().split("T")[0]}.xlsx`;
+      await downloadExcel(wb, filename);
+    } catch (error) {
+      Alert.alert("Error", "No se pudo generar el archivo Excel individual.");
+      console.error(error);
+    } finally {
+      setExportingProcessId(null);
+    }
   };
 
   const handleExportIndividual = async () => {
@@ -229,6 +259,17 @@ export default function ExportarScreen() {
                       <Text style={styles.processSelectName}>{p.processName || "Sin nombre"}</Text>
                       {p.areaName && <Text style={styles.processSelectArea}>{p.areaName}</Text>}
                     </View>
+                    <TouchableOpacity
+                      style={styles.individualExportBtn}
+                      onPress={(e) => { e.stopPropagation(); handleExportSingleProcess(p.id); }}
+                      disabled={exportingProcessId === p.id}
+                    >
+                      {exportingProcessId === p.id ? (
+                        <ActivityIndicator size="small" color="#CC2229" />
+                      ) : (
+                        <MaterialIcons name="file-download" size={20} color="#CC2229" />
+                      )}
+                    </TouchableOpacity>
                     <View style={[styles.processStatusDot, { backgroundColor: p.processName ? "#5CB85C" : "#F5A623" }]} />
                   </TouchableOpacity>
                 );
@@ -332,7 +373,7 @@ export default function ExportarScreen() {
                 }
                 setIsExporting(true);
                 try {
-                  const XLSX = require("xlsx");
+                  const XLSX = require("xlsx-js-style");
                   const wb = XLSX.utils.book_new();
                   const moduleLabels: Record<string, string> = {
                     orgHierarchies: "Organigrama",
@@ -469,6 +510,10 @@ const styles = StyleSheet.create({
   processSelectName: { fontSize: 14, fontWeight: "700", color: "#1A1A2E" },
   processSelectArea: { fontSize: 12, color: "#6B7280", marginTop: 1 },
   processStatusDot: { width: 8, height: 8, borderRadius: 4 },
+  individualExportBtn: {
+    width: 36, height: 36, borderRadius: 8, backgroundColor: "#FEE2E2",
+    alignItems: "center", justifyContent: "center", marginLeft: 8,
+  },
   consolidatedCard: {
     flexDirection: "row", alignItems: "flex-start", gap: 10,
     backgroundColor: "#EFF6FF", borderRadius: 10, padding: 14,

@@ -496,6 +496,43 @@ export async function saveDofa(userId: number, data: { debilidades: string[]; op
   }
 }
 
+// Admin: save DOFA by processId (for admin editing other users' DOFA)
+export async function saveDofaByProcessId(processId: number, data: { debilidades: string[]; oportunidades: string[]; fortalezas: string[]; amenazas: string[] }, ctx: AuditContext = {}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const proc = await db.select().from(processes).where(eq(processes.id, processId)).limit(1);
+  if (proc.length === 0) throw new Error("Process not found");
+  const serialized = {
+    debilidades: JSON.stringify(data.debilidades),
+    oportunidades: JSON.stringify(data.oportunidades),
+    fortalezas: JSON.stringify(data.fortalezas),
+    amenazas: JSON.stringify(data.amenazas),
+  };
+  const existing = await db.select().from(dofaMatrix).where(eq(dofaMatrix.processId, processId)).limit(1);
+  if (existing.length === 0) {
+    await db.insert(dofaMatrix).values({ processId, ...serialized });
+    await writeAuditLog(
+      "dofaMatrix", processId, "create", null, data,
+      `Admin creó la matriz DOFA (${data.debilidades.length} debilidades, ${data.fortalezas.length} fortalezas, ${data.oportunidades.length} oportunidades, ${data.amenazas.length} amenazas)`,
+      { ...ctx, processId, processName: ctx.processName ?? proc[0].processName ?? "Proceso" }
+    );
+  } else {
+    const oldRecord = existing[0];
+    const oldData = {
+      debilidades: JSON.parse(oldRecord.debilidades || "[]"),
+      oportunidades: JSON.parse(oldRecord.oportunidades || "[]"),
+      fortalezas: JSON.parse(oldRecord.fortalezas || "[]"),
+      amenazas: JSON.parse(oldRecord.amenazas || "[]"),
+    };
+    await db.update(dofaMatrix).set(serialized).where(eq(dofaMatrix.processId, processId));
+    await writeAuditLog(
+      "dofaMatrix", processId, "update", oldData, data,
+      `Admin actualizó la matriz DOFA`,
+      { ...ctx, processId, processName: ctx.processName ?? proc[0].processName ?? "Proceso" }
+    );
+  }
+}
+
 // ============================================================
 // PROCESS INTERACTIONS
 // ============================================================

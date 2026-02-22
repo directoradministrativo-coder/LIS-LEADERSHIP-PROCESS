@@ -402,3 +402,23 @@
 - [x] Nueva función buildConsolidatedExcelWorkbook genera 7 hojas: Portada, Organigrama, KPIs, DOFA, Proveedores, Clientes, Proyectos + Historial opcional
 - [x] Cada hoja incluye columna "Proceso" para identificar el origen de cada fila
 - [x] handleExportAdmin reescrito para usar buildConsolidatedExcelWorkbook en vez de solo portada
+
+## Ajuste v26 — Permisos admin editar/eliminar + 3 mejoras Excel
+
+### Permisos admin/superadmin
+- [x] Auditar todos los módulos: identificar dónde user puede editar/eliminar pero admin/superadmin NO pueden al ver datos de otros procesos
+- [x] Habilitar botones editar/eliminar para admin/superadmin en KPIs (editar modal + eliminar), DOFA (eliminar items + guardar), Interacciones (eliminar interacciones)
+- [x] Nuevo endpoint admin.saveDofaByProcessId para que admin pueda guardar DOFA de cualquier proceso
+
+### Mejora Excel 1: Formato visual profesional
+- [x] Migración de xlsx a xlsx-js-style para soporte de estilos de celda
+- [x] Estilos corporativos LIS: encabezados rojo (#CC2229), sub-encabezados azul (#1B4F9B), filas alternadas, DOFA con colores por categoría
+- [x] Aplicado a TODAS las hojas de Excel individual y consolidado
+
+### Mejora Excel 2: Exportación individual desde vista admin
+- [x] Botón de descarga individual por proceso en la vista admin de selección (icono file-download en cada fila)
+- [x] Función handleExportSingleProcess genera Excel individual usando buildExcelWorkbook con datos del proceso seleccionado
+
+### Mejora Excel 3: Resumen estadístico en portada
+- [x] Portada del consolidado incluye resumen estadístico global (Total Colaboradores, KPIs, Proveedores, Clientes, Proyectos, Items DOFA)
+- [x] Tabla detallada por proceso con métricas individuales (Colaboradores, KPIs, Proveedores, Clientes, Proyectos, Items DOFA)

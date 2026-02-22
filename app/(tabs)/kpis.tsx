@@ -40,7 +40,10 @@ const EMPTY_FORM: KPIForm = {
 function AdminKPIsView() {
   const allKPIsQuery = trpc.admin.getAllKPIs.useQuery();
   const [selectedProcessId, setSelectedProcessId] = useState<number | null>(null);
-  const [showFilter, setShowFilter] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [form, setForm] = useState<KPIForm>(EMPTY_FORM);
+  const [formErrors, setFormErrors] = useState<string[]>([]);
 
   const allData = allKPIsQuery.data ?? [];
 
@@ -49,7 +52,49 @@ function AdminKPIsView() {
     return allData.filter(p => p.processId === selectedProcessId);
   }, [allData, selectedProcessId]);
 
-  const totalKPIs = filteredData.reduce((sum, p) => sum + p.kpis.length, 0);
+  const updateKPI = trpc.kpi.update.useMutation({
+    onSuccess: () => { allKPIsQuery.refetch(); setShowEditModal(false); setEditingId(null); setForm(EMPTY_FORM); },
+  });
+
+  const deleteKPI = trpc.kpi.delete.useMutation({
+    onSuccess: () => allKPIsQuery.refetch(),
+  });
+
+  const validateForm = (): boolean => {
+    const errors: string[] = [];
+    if (!form.name.trim()) errors.push("• Nombre del KPI es obligatorio");
+    if (!form.objective.trim()) errors.push("• Objetivo es obligatorio");
+    if (!form.formula.trim()) errors.push("• Fórmula de cálculo es obligatoria");
+    if (!form.responsible.trim()) errors.push("• Responsable es obligatorio");
+    setFormErrors(errors);
+    return errors.length === 0;
+  };
+
+  const handleSave = () => {
+    if (!validateForm() || !editingId) return;
+    updateKPI.mutate({ id: editingId, ...form });
+  };
+
+  const handleEdit = (kpi: any) => {
+    setForm({
+      name: kpi.name,
+      objective: kpi.objective,
+      frequency: kpi.frequency,
+      formula: kpi.formula,
+      responsible: kpi.responsible,
+      observations: kpi.observations ?? "",
+    });
+    setEditingId(kpi.id);
+    setFormErrors([]);
+    setShowEditModal(true);
+  };
+
+  const handleDelete = (id: number, name: string) => {
+    Alert.alert("Eliminar KPI", `¿Eliminar el KPI "${name}"?`, [
+      { text: "Cancelar", style: "cancel" },
+      { text: "Eliminar", style: "destructive", onPress: () => deleteKPI.mutate({ id }) },
+    ]);
+  };
 
   if (allKPIsQuery.isLoading) {
     return (
@@ -122,13 +167,13 @@ function AdminKPIsView() {
                     <Text style={styles.kpiNumberText}>{index + 1}</Text>
                   </View>
                   <Text style={styles.kpiName} numberOfLines={2}>{kpi.name}</Text>
-                  <View style={styles.frequencyBadge}>
-                    <Text style={styles.frequencyIcon}>
-                      {FREQUENCY_OPTIONS.find(f => f.value === kpi.frequency)?.icon ?? "📅"}
-                    </Text>
-                    <Text style={styles.frequencyText}>
-                      {FREQUENCY_OPTIONS.find(f => f.value === kpi.frequency)?.label ?? kpi.frequency}
-                    </Text>
+                  <View style={styles.kpiActions}>
+                    <TouchableOpacity style={styles.editBtn} onPress={() => handleEdit(kpi)}>
+                      <Text style={styles.editBtnText}>✏️</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleDelete(kpi.id, kpi.name)}>
+                      <Text style={styles.deleteIcon}>🗑</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
                 <View style={styles.kpiBody}>
@@ -142,6 +187,44 @@ function AdminKPIsView() {
         ))}
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Edit KPI Modal */}
+      <KeyboardModal
+        visible={showEditModal}
+        onClose={() => { setShowEditModal(false); setForm(EMPTY_FORM); setEditingId(null); }}
+        title="Editar KPI"
+      >
+        <View style={styles.modalPadding}>
+          {formErrors.length > 0 && (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorTitle}>⚠️ Campos obligatorios incompletos:</Text>
+              {formErrors.map((e, i) => <Text key={i} style={styles.errorItem}>{e}</Text>)}
+            </View>
+          )}
+          <FormField label="Nombre del KPI *" value={form.name} onChangeText={v => setForm(f => ({ ...f, name: v }))} placeholder="Ej: Nivel de Servicio al Cliente" hasError={formErrors.some(e => e.includes("Nombre"))} />
+          <FormField label="Objetivo *" value={form.objective} onChangeText={v => setForm(f => ({ ...f, objective: v }))} placeholder="Ej: Medir el porcentaje de pedidos entregados a tiempo" multiline hasError={formErrors.some(e => e.includes("Objetivo"))} />
+          <FormField label="Fórmula de Cálculo *" value={form.formula} onChangeText={v => setForm(f => ({ ...f, formula: v }))} placeholder="Ej: (Pedidos entregados a tiempo / Total pedidos) × 100" multiline isFormula hasError={formErrors.some(e => e.includes("Fórmula"))} />
+          <FormField label="Responsable *" value={form.responsible} onChangeText={v => setForm(f => ({ ...f, responsible: v }))} placeholder="Ej: Gerente de Operaciones" hasError={formErrors.some(e => e.includes("Responsable"))} />
+          <FormField label="Observaciones" value={form.observations} onChangeText={v => setForm(f => ({ ...f, observations: v }))} placeholder="Observaciones adicionales sobre este KPI..." multiline />
+          <Text style={styles.inputLabel}>Frecuencia de Medición *</Text>
+          <View style={styles.frequencySelector}>
+            {FREQUENCY_OPTIONS.map(opt => (
+              <TouchableOpacity key={opt.value} style={[styles.freqOption, form.frequency === opt.value && styles.freqOptionActive]} onPress={() => setForm(f => ({ ...f, frequency: opt.value }))}>
+                <Text style={styles.freqOptionIcon}>{opt.icon}</Text>
+                <Text style={[styles.freqOptionText, form.frequency === opt.value && styles.freqOptionTextActive]}>{opt.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={styles.modalActions}>
+            <TouchableOpacity style={styles.cancelModalBtn} onPress={() => { setShowEditModal(false); setForm(EMPTY_FORM); setEditingId(null); }}>
+              <Text style={styles.cancelModalText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.saveModalBtn} onPress={handleSave} disabled={updateKPI.isPending}>
+              {updateKPI.isPending ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.saveModalText}>Actualizar</Text>}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardModal>
     </View>
   );
 }

@@ -49,6 +49,10 @@ function AdminInteraccionesView() {
   const [selectedProcessId, setSelectedProcessId] = useState<number | null>(null);
   const [activeType, setActiveType] = useState<InteractionType>("proveedor");
 
+  const deleteInteractionAdmin = trpc.admin.deleteInteraction.useMutation({
+    onSuccess: () => allInteractionsQuery.refetch(),
+  });
+
   const allData = allInteractionsQuery.data ?? [];
 
   const filteredData = useMemo(() => {
@@ -163,6 +167,15 @@ function AdminInteraccionesView() {
                       <Text style={styles.adminInteractionMeta}>{interaction.strengths.length} fortaleza{interaction.strengths.length !== 1 ? "s" : ""}/oportunidad{interaction.strengths.length !== 1 ? "es" : ""}</Text>
                     )}
                   </View>
+                  <TouchableOpacity
+                    onPress={() => Alert.alert("Eliminar", `¿Eliminar "${interaction.relatedProcessName}"?`, [
+                      { text: "Cancelar", style: "cancel" },
+                      { text: "Eliminar", style: "destructive", onPress: () => deleteInteractionAdmin.mutate({ id: interaction.id }) },
+                    ])}
+                    style={{ padding: 6 }}
+                  >
+                    <Text style={{ fontSize: 16 }}>🗑</Text>
+                  </TouchableOpacity>
                 </View>
               ))}
             </View>

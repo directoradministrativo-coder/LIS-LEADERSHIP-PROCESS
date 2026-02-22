@@ -63,6 +63,14 @@ type DofaData = {
 function AdminDofaView() {
   const allDofaQuery = trpc.admin.getAllDofa.useQuery();
   const [selectedProcessId, setSelectedProcessId] = useState<number | null>(null);
+  // Editable local state per process: { [processId]: DofaData }
+  const [editingProcessId, setEditingProcessId] = useState<number | null>(null);
+  const [editData, setEditData] = useState<DofaData>({ debilidades: [], oportunidades: [], fortalezas: [], amenazas: [] });
+  const [newItems, setNewItems] = useState<Record<string, string>>({ debilidades: "", oportunidades: "", fortalezas: "", amenazas: "" });
+
+  const saveDofaMut = trpc.admin.saveDofaByProcessId.useMutation({
+    onSuccess: () => { allDofaQuery.refetch(); setEditingProcessId(null); },
+  });
 
   const allData = allDofaQuery.data ?? [];
 
@@ -70,6 +78,28 @@ function AdminDofaView() {
     if (selectedProcessId === null) return allData;
     return allData.filter(p => p.processId === selectedProcessId);
   }, [allData, selectedProcessId]);
+
+  const startEditing = (processId: number, dofa: DofaData) => {
+    setEditingProcessId(processId);
+    setEditData({ ...dofa });
+    setNewItems({ debilidades: "", oportunidades: "", fortalezas: "", amenazas: "" });
+  };
+
+  const handleAddItem = (section: keyof DofaData) => {
+    const text = newItems[section]?.trim();
+    if (!text) return;
+    setEditData(prev => ({ ...prev, [section]: [...prev[section], text] }));
+    setNewItems(prev => ({ ...prev, [section]: "" }));
+  };
+
+  const handleRemoveItem = (section: keyof DofaData, index: number) => {
+    setEditData(prev => ({ ...prev, [section]: prev[section].filter((_, i) => i !== index) }));
+  };
+
+  const handleSaveDofa = () => {
+    if (!editingProcessId) return;
+    saveDofaMut.mutate({ processId: editingProcessId, ...editData });
+  };
 
   if (allDofaQuery.isLoading) {
     return (
@@ -121,7 +151,10 @@ function AdminDofaView() {
       </View>
 
       <ScrollView style={{ flex: 1, padding: 16 }} showsVerticalScrollIndicator={false}>
-        {filteredData.map(processGroup => (
+        {filteredData.map(processGroup => {
+          const isEditing = editingProcessId === processGroup.processId;
+          const currentDofa = isEditing ? editData : processGroup.dofa;
+          return (
           <View key={processGroup.processId} style={styles.processBlock}>
             {/* Process Header */}
             <View style={styles.processBlockHeader}>
@@ -132,22 +165,37 @@ function AdminDofaView() {
                   <Text style={styles.processBlockLeader}>Líder: {processGroup.leaderName}</Text>
                 ) : null}
               </View>
-              {/* Summary counts */}
-              <View style={styles.dofaSummaryRow}>
-                {DOFA_SECTIONS.map(s => (
-                  <View key={s.key} style={[styles.dofaSummaryBadge, { backgroundColor: s.color }]}>
-                    <Text style={styles.dofaSummaryBadgeText}>
-                      {processGroup.dofa[s.key]?.length ?? 0}
-                    </Text>
-                  </View>
-                ))}
-              </View>
+              {/* Edit / Save button */}
+              {isEditing ? (
+                <View style={{ flexDirection: "row", gap: 6 }}>
+                  <TouchableOpacity
+                    style={{ backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}
+                    onPress={() => setEditingProcessId(null)}
+                  >
+                    <Text style={{ color: "#FFF", fontSize: 12, fontWeight: "600" }}>Cancelar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{ backgroundColor: "#5CB85C", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}
+                    onPress={handleSaveDofa}
+                    disabled={saveDofaMut.isPending}
+                  >
+                    {saveDofaMut.isPending ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={{ color: "#FFF", fontSize: 12, fontWeight: "700" }}>Guardar</Text>}
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={{ backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}
+                  onPress={() => startEditing(processGroup.processId, processGroup.dofa as DofaData)}
+                >
+                  <Text style={{ color: "#FFF", fontSize: 12, fontWeight: "600" }}>✏️ Editar</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             {/* DOFA Sections */}
             {DOFA_SECTIONS.map(section => {
-              const items = processGroup.dofa[section.key] ?? [];
-              if (items.length === 0) return null;
+              const items = (currentDofa as DofaData)[section.key] ?? [];
+              if (items.length === 0 && !isEditing) return null;
               return (
                 <View key={section.key} style={[styles.dofaSectionCard, { borderLeftColor: section.color }]}>
                   <View style={[styles.dofaSectionHeader, { backgroundColor: section.bgColor }]}>
@@ -158,18 +206,46 @@ function AdminDofaView() {
                     </View>
                   </View>
                   <View style={styles.dofaItemsList}>
-                    {items.map((item, idx) => (
+                    {items.length === 0 ? (
+                      <Text style={{ fontSize: 13, color: "#9CA3AF", fontStyle: "italic", paddingVertical: 4 }}>Sin elementos</Text>
+                    ) : items.map((item, idx) => (
                       <View key={idx} style={styles.dofaItemRow}>
                         <View style={[styles.itemBullet, { backgroundColor: section.color }]} />
                         <Text style={styles.itemText}>{item}</Text>
+                        {isEditing && (
+                          <TouchableOpacity onPress={() => handleRemoveItem(section.key, idx)} style={styles.removeBtn}>
+                            <Text style={styles.removeBtnText}>✕</Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
                     ))}
                   </View>
+                  {isEditing && (
+                    <View style={styles.addItemContainer}>
+                      <TextInput
+                        style={[styles.addItemInput, { borderColor: section.borderColor }]}
+                        value={newItems[section.key]}
+                        onChangeText={v => setNewItems(prev => ({ ...prev, [section.key]: v }))}
+                        placeholder={section.placeholder}
+                        placeholderTextColor="#9CA3AF"
+                        multiline
+                        returnKeyType="done"
+                        onSubmitEditing={() => handleAddItem(section.key)}
+                      />
+                      <TouchableOpacity
+                        style={[styles.addItemBtn, { backgroundColor: section.color }]}
+                        onPress={() => handleAddItem(section.key)}
+                      >
+                        <Text style={styles.addItemBtnText}>+</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
               );
             })}
           </View>
-        ))}
+          );
+        })}
         <View style={{ height: 40 }} />
       </ScrollView>
     </View>

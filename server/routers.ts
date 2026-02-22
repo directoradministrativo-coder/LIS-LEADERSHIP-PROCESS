@@ -334,6 +334,27 @@ export const appRouter = router({
       if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
       return db.getAllProcessNames();
     }),
+    // Admin: save DOFA for any process by processId
+    saveDofaByProcessId: protectedProcedure
+      .input(z.object({
+        processId: z.number(),
+        debilidades: z.array(z.string()),
+        oportunidades: z.array(z.string()),
+        fortalezas: z.array(z.string()),
+        amenazas: z.array(z.string()),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
+        const { processId, ...data } = input;
+        return db.saveDofaByProcessId(processId, data, { userId: ctx.user.id, userName: ctx.user.name ?? undefined, userEmail: ctx.user.email ?? undefined });
+      }),
+    // Admin: delete interaction by id
+    deleteInteraction: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
+        return db.deleteInteraction(input.id, { userId: ctx.user.id, userName: ctx.user.name ?? undefined, userEmail: ctx.user.email ?? undefined });
+      }),
   }),
 
   // Check if user is authorized (public - called after OAuth login)
