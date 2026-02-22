@@ -580,6 +580,12 @@ export async function createInteractionStrength(data: { interactionId: number; t
   await db.insert(interactionStrengths).values(data);
 }
 
+export async function updateInteractionStrength(id: number, description: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(interactionStrengths).set({ description }).where(eq(interactionStrengths.id, id));
+}
+
 export async function deleteInteractionStrength(id: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

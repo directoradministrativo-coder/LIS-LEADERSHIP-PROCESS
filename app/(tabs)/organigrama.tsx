@@ -1,6 +1,6 @@
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
-  Alert, ActivityIndicator, FlatList, Platform, KeyboardAvoidingView
+  Alert, ActivityIndicator, FlatList
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { KeyboardModal } from "@/components/keyboard-modal";
@@ -43,9 +43,27 @@ type CollaboratorFunction = {
 export default function OrganigramaScreen() {
   const [selectedHierarchyId, setSelectedHierarchyId] = useState<number | null>(null);
   const [selectedCollaboratorId, setSelectedCollaboratorId] = useState<number | null>(null);
+
+  // Add modals
   const [showAddHierarchy, setShowAddHierarchy] = useState(false);
   const [showAddCollaborator, setShowAddCollaborator] = useState(false);
   const [showFunctionsModal, setShowFunctionsModal] = useState(false);
+
+  // Edit modals
+  const [showEditHierarchy, setShowEditHierarchy] = useState(false);
+  const [editingHierarchy, setEditingHierarchy] = useState<Hierarchy | null>(null);
+  const [editHierarchyName, setEditHierarchyName] = useState("");
+  const [editHierarchyLevel, setEditHierarchyLevel] = useState(1);
+
+  const [showEditCollaborator, setShowEditCollaborator] = useState(false);
+  const [editingCollaborator, setEditingCollaborator] = useState<Collaborator | null>(null);
+  const [editCollaboratorName, setEditCollaboratorName] = useState("");
+  const [editCollaboratorPosition, setEditCollaboratorPosition] = useState("");
+
+  const [editingFunctionId, setEditingFunctionId] = useState<number | null>(null);
+  const [editFunctionText, setEditFunctionText] = useState("");
+
+  // Form state
   const [newHierarchyName, setNewHierarchyName] = useState("");
   const [newHierarchyLevel, setNewHierarchyLevel] = useState(1);
   const [newCollaboratorName, setNewCollaboratorName] = useState("");
@@ -59,12 +77,20 @@ export default function OrganigramaScreen() {
     onSuccess: () => { hierarchiesQuery.refetch(); setShowAddHierarchy(false); setNewHierarchyName(""); },
   });
 
+  const updateHierarchy = trpc.hierarchy.update.useMutation({
+    onSuccess: () => { hierarchiesQuery.refetch(); setShowEditHierarchy(false); setEditingHierarchy(null); },
+  });
+
   const deleteHierarchy = trpc.hierarchy.delete.useMutation({
     onSuccess: () => { hierarchiesQuery.refetch(); collaboratorsQuery.refetch(); setSelectedHierarchyId(null); },
   });
 
   const createCollaborator = trpc.collaborator.create.useMutation({
     onSuccess: () => { collaboratorsQuery.refetch(); setShowAddCollaborator(false); setNewCollaboratorName(""); setNewCollaboratorPosition(""); },
+  });
+
+  const updateCollaborator = trpc.collaborator.update.useMutation({
+    onSuccess: () => { collaboratorsQuery.refetch(); setShowEditCollaborator(false); setEditingCollaborator(null); },
   });
 
   const deleteCollaborator = trpc.collaborator.delete.useMutation({
@@ -78,6 +104,10 @@ export default function OrganigramaScreen() {
 
   const createFunction = trpc.collaboratorFunction.create.useMutation({
     onSuccess: () => { functionsQuery.refetch(); setNewFunctionText(""); },
+  });
+
+  const updateFunction = trpc.collaboratorFunction.update.useMutation({
+    onSuccess: () => { functionsQuery.refetch(); setEditingFunctionId(null); setEditFunctionText(""); },
   });
 
   const deleteFunction = trpc.collaboratorFunction.delete.useMutation({
@@ -97,6 +127,18 @@ export default function OrganigramaScreen() {
     createHierarchy.mutate({ name: newHierarchyName.trim(), level: newHierarchyLevel });
   };
 
+  const handleEditHierarchy = (h: Hierarchy) => {
+    setEditingHierarchy(h);
+    setEditHierarchyName(h.name);
+    setEditHierarchyLevel(h.level);
+    setShowEditHierarchy(true);
+  };
+
+  const handleSaveEditHierarchy = () => {
+    if (!editHierarchyName.trim() || !editingHierarchy) return;
+    updateHierarchy.mutate({ id: editingHierarchy.id, name: editHierarchyName.trim(), level: editHierarchyLevel });
+  };
+
   const handleAddCollaborator = () => {
     if (!newCollaboratorName.trim() || !selectedHierarchyId) {
       Alert.alert("Error", "Ingresa el nombre del colaborador");
@@ -109,9 +151,30 @@ export default function OrganigramaScreen() {
     });
   };
 
+  const handleEditCollaborator = (c: Collaborator) => {
+    setEditingCollaborator(c);
+    setEditCollaboratorName(c.name);
+    setEditCollaboratorPosition(c.position ?? "");
+    setShowEditCollaborator(true);
+  };
+
+  const handleSaveEditCollaborator = () => {
+    if (!editCollaboratorName.trim() || !editingCollaborator) return;
+    updateCollaborator.mutate({
+      id: editingCollaborator.id,
+      name: editCollaboratorName.trim(),
+      position: editCollaboratorPosition.trim() || undefined,
+    });
+  };
+
   const handleAddFunction = () => {
     if (!newFunctionText.trim() || !selectedCollaboratorId) return;
     createFunction.mutate({ collaboratorId: selectedCollaboratorId, description: newFunctionText.trim() });
+  };
+
+  const handleSaveEditFunction = () => {
+    if (!editFunctionText.trim() || !editingFunctionId) return;
+    updateFunction.mutate({ id: editingFunctionId, description: editFunctionText.trim() });
   };
 
   const selectedCollaborator = collaborators.find(c => c.id === selectedCollaboratorId);
@@ -170,6 +233,9 @@ export default function OrganigramaScreen() {
                           >
                             <Text style={[styles.smallBtnText, { color: levelInfo.color }]}>+ Persona</Text>
                           </TouchableOpacity>
+                          <TouchableOpacity onPress={() => handleEditHierarchy(hierarchy)}>
+                            <Text style={styles.editIcon}>✏️</Text>
+                          </TouchableOpacity>
                           <TouchableOpacity
                             onPress={() => Alert.alert("Eliminar", `¿Eliminar "${hierarchy.name}" y sus colaboradores?`, [
                               { text: "Cancelar", style: "cancel" },
@@ -198,6 +264,9 @@ export default function OrganigramaScreen() {
                                   }}
                                 >
                                   <Text style={styles.functionsBtnText}>Funciones</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={() => handleEditCollaborator(collab)}>
+                                  <Text style={styles.editIcon}>✏️</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                   onPress={() => Alert.alert("Eliminar", `¿Eliminar a "${collab.name}"?`, [
@@ -264,6 +333,48 @@ export default function OrganigramaScreen() {
         </View>
       </KeyboardModal>
 
+      {/* Edit Hierarchy Modal */}
+      <KeyboardModal
+        visible={showEditHierarchy}
+        onClose={() => { setShowEditHierarchy(false); setEditingHierarchy(null); }}
+        title="Editar Cargo"
+      >
+        <View style={styles.modalPadding}>
+          <Text style={styles.inputLabel}>Nombre del Cargo</Text>
+          <TextInput
+            style={styles.input}
+            value={editHierarchyName}
+            onChangeText={setEditHierarchyName}
+            placeholder="Ej: Director Comercial"
+            placeholderTextColor="#9CA3AF"
+            autoFocus
+            returnKeyType="done"
+          />
+          <Text style={styles.inputLabel}>Nivel Jerárquico</Text>
+          <View style={styles.levelSelector}>
+            {HIERARCHY_LEVELS.map(l => (
+              <TouchableOpacity
+                key={l.level}
+                style={[styles.levelOption, editHierarchyLevel === l.level && { backgroundColor: l.color }]}
+                onPress={() => setEditHierarchyLevel(l.level)}
+              >
+                <Text style={[styles.levelOptionText, editHierarchyLevel === l.level && { color: "#FFF" }]}>
+                  {l.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={styles.modalActions}>
+            <TouchableOpacity style={styles.cancelModalBtn} onPress={() => { setShowEditHierarchy(false); setEditingHierarchy(null); }}>
+              <Text style={styles.cancelModalText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.saveModalBtn} onPress={handleSaveEditHierarchy} disabled={updateHierarchy.isPending}>
+              {updateHierarchy.isPending ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.saveModalText}>Guardar</Text>}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardModal>
+
       {/* Add Collaborator Modal */}
       <KeyboardModal
         visible={showAddCollaborator}
@@ -301,10 +412,47 @@ export default function OrganigramaScreen() {
         </View>
       </KeyboardModal>
 
+      {/* Edit Collaborator Modal */}
+      <KeyboardModal
+        visible={showEditCollaborator}
+        onClose={() => { setShowEditCollaborator(false); setEditingCollaborator(null); }}
+        title="Editar Persona"
+      >
+        <View style={styles.modalPadding}>
+          <Text style={styles.inputLabel}>Nombre Completo</Text>
+          <TextInput
+            style={styles.input}
+            value={editCollaboratorName}
+            onChangeText={setEditCollaboratorName}
+            placeholder="Ej: Juan Pérez"
+            placeholderTextColor="#9CA3AF"
+            autoFocus
+            returnKeyType="next"
+          />
+          <Text style={styles.inputLabel}>Cargo / Posición (opcional)</Text>
+          <TextInput
+            style={styles.input}
+            value={editCollaboratorPosition}
+            onChangeText={setEditCollaboratorPosition}
+            placeholder="Ej: Director Comercial"
+            placeholderTextColor="#9CA3AF"
+            returnKeyType="done"
+          />
+          <View style={styles.modalActions}>
+            <TouchableOpacity style={styles.cancelModalBtn} onPress={() => { setShowEditCollaborator(false); setEditingCollaborator(null); }}>
+              <Text style={styles.cancelModalText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.saveModalBtn} onPress={handleSaveEditCollaborator} disabled={updateCollaborator.isPending}>
+              {updateCollaborator.isPending ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.saveModalText}>Guardar</Text>}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardModal>
+
       {/* Functions Modal */}
       <KeyboardModal
         visible={showFunctionsModal}
-        onClose={() => { setShowFunctionsModal(false); setNewFunctionText(""); }}
+        onClose={() => { setShowFunctionsModal(false); setNewFunctionText(""); setEditingFunctionId(null); setEditFunctionText(""); }}
         title={`Funciones de ${selectedCollaborator?.name ?? ""}`}
       >
         <View style={styles.modalPadding}>
@@ -313,10 +461,44 @@ export default function OrganigramaScreen() {
             keyExtractor={item => String(item.id)}
             renderItem={({ item }) => (
               <View style={styles.functionItem}>
-                <Text style={styles.functionText}>• {item.description}</Text>
-                <TouchableOpacity onPress={() => deleteFunction.mutate({ id: item.id })}>
-                  <Text style={styles.deleteIcon}>🗑</Text>
-                </TouchableOpacity>
+                {editingFunctionId === item.id ? (
+                  <View style={{ flex: 1 }}>
+                    <TextInput
+                      style={[styles.input, { minHeight: 50, marginBottom: 6 }]}
+                      value={editFunctionText}
+                      onChangeText={setEditFunctionText}
+                      multiline
+                      autoFocus
+                    />
+                    <View style={{ flexDirection: "row", gap: 6 }}>
+                      <TouchableOpacity
+                        style={[styles.cancelModalBtn, { flex: 1, paddingVertical: 8 }]}
+                        onPress={() => { setEditingFunctionId(null); setEditFunctionText(""); }}
+                      >
+                        <Text style={styles.cancelModalText}>Cancelar</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.saveModalBtn, { flex: 1, paddingVertical: 8 }]}
+                        onPress={handleSaveEditFunction}
+                        disabled={updateFunction.isPending}
+                      >
+                        {updateFunction.isPending
+                          ? <ActivityIndicator size="small" color="#FFF" />
+                          : <Text style={styles.saveModalText}>Guardar</Text>}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    <Text style={styles.functionText}>• {item.description}</Text>
+                    <TouchableOpacity onPress={() => { setEditingFunctionId(item.id); setEditFunctionText(item.description); }}>
+                      <Text style={styles.editIcon}>✏️</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => deleteFunction.mutate({ id: item.id })}>
+                      <Text style={styles.deleteIcon}>🗑</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             )}
             ListEmptyComponent={<Text style={styles.emptyText}>Sin funciones registradas</Text>}
@@ -334,7 +516,7 @@ export default function OrganigramaScreen() {
             returnKeyType="done"
           />
           <View style={styles.modalActions}>
-            <TouchableOpacity style={styles.cancelModalBtn} onPress={() => { setShowFunctionsModal(false); setNewFunctionText(""); }}>
+            <TouchableOpacity style={styles.cancelModalBtn} onPress={() => { setShowFunctionsModal(false); setNewFunctionText(""); setEditingFunctionId(null); setEditFunctionText(""); }}>
               <Text style={styles.cancelModalText}>Cerrar</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.saveModalBtn} onPress={handleAddFunction} disabled={createFunction.isPending}>
@@ -378,6 +560,7 @@ const styles = StyleSheet.create({
   hierarchyActions: { flexDirection: "row", alignItems: "center", gap: 8 },
   smallBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 },
   smallBtnText: { fontSize: 12, fontWeight: "600" },
+  editIcon: { fontSize: 16, padding: 4 },
   deleteIcon: { fontSize: 16, padding: 4 },
   collaboratorsList: { borderTopWidth: 1, borderTopColor: "#F3F4F6", paddingHorizontal: 14, paddingBottom: 8 },
   collaboratorItem: { flexDirection: "row", alignItems: "center", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#F9FAFB" },
@@ -387,10 +570,7 @@ const styles = StyleSheet.create({
   collaboratorActions: { flexDirection: "row", alignItems: "center", gap: 8 },
   functionsBtn: { backgroundColor: "#EFF6FF", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 },
   functionsBtnText: { fontSize: 12, fontWeight: "600", color: "#1B4F9B" },
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  modalContent: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24 },
   modalPadding: { paddingHorizontal: 20, paddingTop: 16 },
-  modalTitle: { fontSize: 18, fontWeight: "800", color: "#1A1A2E", marginBottom: 16 },
   inputLabel: { fontSize: 12, fontWeight: "600", color: "#6B7280", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 },
   input: { borderWidth: 1.5, borderColor: "#E5E7EB", borderRadius: 10, padding: 12, fontSize: 15, color: "#1A1A2E", marginBottom: 14 },
   levelSelector: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 },

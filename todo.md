@@ -356,3 +356,10 @@
 - [ ] Ajuste 6: Organigrama admin integrado con filtro por proceso (corregir vista actual)
 - [ ] Ajuste 8: Interacciones del proceso - agregar opción de editar registros existentes
 - [ ] Ajuste 9: Progreso e Inicio se actualizan en tiempo real sin cerrar sesión
+
+## Ajuste 5 — Editar/Eliminar en todos los módulos
+- [x] Organigrama: botón editar nombre de jerarquía (endpoint hierarchy.update existe)
+- [x] Organigrama: botón editar datos de colaborador (nombre, cargo) (endpoint collaborator.update existe)
+- [x] Organigrama: botón editar descripción de función de colaborador (endpoint collaboratorFunction.update existe)
+- [x] Interacciones: botón editar tarea ya creada (endpoint interactionTask.update existe)
+- [x] Interacciones: botón editar fortaleza/oportunidad (endpoint interactionStrength.update agregado)

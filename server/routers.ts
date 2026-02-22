@@ -229,6 +229,11 @@ export const appRouter = router({
       .mutation(({ input }) => {
         return db.createInteractionStrength(input);
       }),
+    update: protectedProcedure
+      .input(z.object({ id: z.number(), description: z.string().min(1) }))
+      .mutation(({ input }) => {
+        return db.updateInteractionStrength(input.id, input.description);
+      }),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(({ input }) => {

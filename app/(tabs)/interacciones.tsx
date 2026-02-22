@@ -193,6 +193,18 @@ export default function InteraccionesScreen() {
   const [newStrengthText, setNewStrengthText] = useState("");
   const [expandedInteractionId, setExpandedInteractionId] = useState<number | null>(null);
 
+  // Edit task state
+  const [showEditTaskModal, setShowEditTaskModal] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  const [editTaskForm, setEditTaskForm] = useState<TaskForm>(EMPTY_TASK);
+  const [editTaskErrors, setEditTaskErrors] = useState<string[]>([]);
+
+  // Edit strength state
+  const [showEditStrengthModal, setShowEditStrengthModal] = useState(false);
+  const [editingStrengthId, setEditingStrengthId] = useState<number | null>(null);
+  const [editStrengthType, setEditStrengthType] = useState<"fortaleza" | "oportunidad">("fortaleza");
+  const [editStrengthText, setEditStrengthText] = useState("");
+
   const interactionsQuery = trpc.interaction.list.useQuery({ type: activeType });
 
   const createInteraction = trpc.interaction.create.useMutation({
@@ -227,6 +239,14 @@ export default function InteraccionesScreen() {
 
   const deleteStrength = trpc.interactionStrength.delete.useMutation({
     onSuccess: () => strengthsQuery.refetch(),
+  });
+
+  const updateTask = trpc.interactionTask.update.useMutation({
+    onSuccess: () => { tasksQuery.refetch(); setShowEditTaskModal(false); setEditingTaskId(null); setEditTaskForm(EMPTY_TASK); },
+  });
+
+  const updateStrength = trpc.interactionStrength.update.useMutation({
+    onSuccess: () => { strengthsQuery.refetch(); setShowEditStrengthModal(false); setEditingStrengthId(null); setEditStrengthText(""); },
   });
 
   const interactions = interactionsQuery.data ?? [];
@@ -275,6 +295,62 @@ export default function InteraccionesScreen() {
       type: newStrengthType,
       description: newStrengthText.trim(),
     });
+  };
+
+  const handleOpenEditTask = (task: any) => {
+    setEditingTaskId(task.id);
+    setEditTaskForm({
+      taskActivity: task.taskActivity ?? "",
+      documentRoute: task.documentRoute ?? "",
+      responsibleRole: task.responsibleRole ?? "",
+      ansUndefined: task.ansUndefined ?? false,
+      ansNumber: task.ansNumber ?? undefined,
+      ansType: task.ansType ?? "dias_habiles",
+      ansCompliance: task.ansCompliance ?? undefined,
+      observations: task.observations ?? "",
+    });
+    setEditTaskErrors([]);
+    setShowEditTaskModal(true);
+  };
+
+  const validateEditTask = (): boolean => {
+    const errors: string[] = [];
+    if (!editTaskForm.taskActivity.trim()) errors.push("• Tarea / Actividad es obligatoria");
+    if (!editTaskForm.documentRoute.trim()) errors.push("• Documento / Ruta es obligatorio");
+    if (!editTaskForm.responsibleRole.trim()) errors.push("• Responsable es obligatorio");
+    if (!editTaskForm.ansUndefined) {
+      if (!editTaskForm.ansNumber) errors.push("• Número de días del ANS es obligatorio");
+      if (!editTaskForm.ansType) errors.push("• Tipo de ANS es obligatorio");
+      if (!editTaskForm.ansCompliance) errors.push("• Nivel de cumplimiento ANS es obligatorio");
+    }
+    setEditTaskErrors(errors);
+    return errors.length === 0;
+  };
+
+  const handleSaveEditTask = () => {
+    if (!validateEditTask() || !editingTaskId) return;
+    updateTask.mutate({
+      id: editingTaskId,
+      taskActivity: editTaskForm.taskActivity.trim(),
+      documentRoute: editTaskForm.documentRoute.trim(),
+      responsibleRole: editTaskForm.responsibleRole.trim(),
+      ansUndefined: editTaskForm.ansUndefined,
+      ansNumber: editTaskForm.ansUndefined ? null : editTaskForm.ansNumber,
+      ansType: editTaskForm.ansUndefined ? null : editTaskForm.ansType,
+      ansCompliance: editTaskForm.ansUndefined ? null : editTaskForm.ansCompliance,
+    });
+  };
+
+  const handleOpenEditStrength = (strength: any) => {
+    setEditingStrengthId(strength.id);
+    setEditStrengthType(strength.type);
+    setEditStrengthText(strength.description);
+    setShowEditStrengthModal(true);
+  };
+
+  const handleSaveEditStrength = () => {
+    if (!editStrengthText.trim() || !editingStrengthId) return;
+    updateStrength.mutate({ id: editingStrengthId, description: editStrengthText.trim() });
   };
 
   const typeConfig = {
@@ -392,9 +468,14 @@ export default function InteraccionesScreen() {
                                   ⏱ ANS: {task.ansUndefined ? "No definido" : `${task.ansNumber} ${ANS_TYPES.find(t => t.value === task.ansType)?.label ?? ""} | Cumplimiento: ${task.ansCompliance}/5`}
                                 </Text>
                               </View>
-                              <TouchableOpacity onPress={() => deleteTask.mutate({ id: task.id })}>
-                                <Text style={styles.deleteIcon}>🗑</Text>
-                              </TouchableOpacity>
+                              <View style={{ flexDirection: "row", gap: 4 }}>
+                                <TouchableOpacity onPress={() => handleOpenEditTask(task)}>
+                                  <Text style={styles.editIcon}>✏️</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={() => deleteTask.mutate({ id: task.id })}>
+                                  <Text style={styles.deleteIcon}>🗑</Text>
+                                </TouchableOpacity>
+                              </View>
                             </View>
                           ))}
                           {(tasksQuery.data ?? []).length === 0 && (
@@ -421,9 +502,14 @@ export default function InteraccionesScreen() {
                                 </Text>
                                 <Text style={styles.strengthText}>{strength.description}</Text>
                               </View>
-                              <TouchableOpacity onPress={() => deleteStrength.mutate({ id: strength.id })}>
-                                <Text style={styles.deleteIcon}>🗑</Text>
-                              </TouchableOpacity>
+                              <View style={{ flexDirection: "row", gap: 4 }}>
+                                <TouchableOpacity onPress={() => handleOpenEditStrength(strength)}>
+                                  <Text style={styles.editIcon}>✏️</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity onPress={() => deleteStrength.mutate({ id: strength.id })}>
+                                  <Text style={styles.deleteIcon}>🗑</Text>
+                                </TouchableOpacity>
+                              </View>
                             </View>
                           ))}
                           {(strengthsQuery.data ?? []).length === 0 && (
@@ -569,6 +655,97 @@ export default function InteraccionesScreen() {
           </View>
         </View>
       </KeyboardModal>
+
+      {/* Edit Task Modal */}
+      <KeyboardModal
+        visible={showEditTaskModal}
+        onClose={() => { setShowEditTaskModal(false); setEditingTaskId(null); setEditTaskForm(EMPTY_TASK); setEditTaskErrors([]); }}
+        title="Editar Tarea / Actividad"
+      >
+        <View style={styles.modalPadding}>
+          {editTaskErrors.length > 0 && (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorTitle}>⚠️ Campos obligatorios incompletos:</Text>
+              {editTaskErrors.map((e, i) => <Text key={i} style={styles.errorItem}>{e}</Text>)}
+            </View>
+          )}
+          <Text style={styles.inputLabel}>Tarea / Actividad *</Text>
+          <TextInput style={[styles.input, { minHeight: 60 }, editTaskErrors.some(e => e.includes("Tarea")) && styles.inputError]} value={editTaskForm.taskActivity} onChangeText={v => setEditTaskForm(f => ({ ...f, taskActivity: v }))} placeholder="Describe la tarea o actividad" placeholderTextColor="#9CA3AF" multiline />
+          <Text style={styles.inputLabel}>Documento / Ruta *</Text>
+          <TextInput style={[styles.input, editTaskErrors.some(e => e.includes("Documento")) && styles.inputError]} value={editTaskForm.documentRoute} onChangeText={v => setEditTaskForm(f => ({ ...f, documentRoute: v }))} placeholder="Ej: Formato FO-LOG-001" placeholderTextColor="#9CA3AF" />
+          <Text style={styles.inputLabel}>Responsable *</Text>
+          <TextInput style={[styles.input, editTaskErrors.some(e => e.includes("Responsable")) && styles.inputError]} value={editTaskForm.responsibleRole} onChangeText={v => setEditTaskForm(f => ({ ...f, responsibleRole: v }))} placeholder="Ej: Coordinador de Logística" placeholderTextColor="#9CA3AF" />
+          <Text style={styles.sectionSubTitle}>ANS (Acuerdo de Nivel de Servicio)</Text>
+          <TouchableOpacity style={[styles.checkRow, editTaskForm.ansUndefined && styles.checkRowActive]} onPress={() => setEditTaskForm(f => ({ ...f, ansUndefined: !f.ansUndefined }))}>
+            <View style={[styles.checkbox, editTaskForm.ansUndefined && styles.checkboxActive]}>
+              {editTaskForm.ansUndefined && <Text style={styles.checkmark}>✓</Text>}
+            </View>
+            <Text style={styles.checkLabel}>ANS No Definido</Text>
+          </TouchableOpacity>
+          {!editTaskForm.ansUndefined && (
+            <>
+              <Text style={styles.inputLabel}>Tiempo de Respuesta</Text>
+              <View style={styles.ansRow}>
+                <TextInput style={[styles.input, { flex: 1 }]} value={editTaskForm.ansNumber?.toString() ?? ""} onChangeText={v => setEditTaskForm(f => ({ ...f, ansNumber: parseInt(v) || undefined }))} placeholder="1-9" placeholderTextColor="#9CA3AF" keyboardType="number-pad" />
+                <View style={styles.ansTypeSelector}>
+                  {ANS_TYPES.map(t => (
+                    <TouchableOpacity key={t.value} style={[styles.ansTypeBtn, editTaskForm.ansType === t.value && styles.ansTypeBtnActive]} onPress={() => setEditTaskForm(f => ({ ...f, ansType: t.value }))}>
+                      <Text style={[styles.ansTypeBtnText, editTaskForm.ansType === t.value && styles.ansTypeBtnTextActive]}>{t.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              <Text style={styles.inputLabel}>Nivel de Cumplimiento (1-5)</Text>
+              <View style={styles.complianceSelector}>
+                {[1, 2, 3, 4, 5].map(n => (
+                  <TouchableOpacity key={n} style={[styles.complianceBtn, editTaskForm.ansCompliance === n && styles.complianceBtnActive]} onPress={() => setEditTaskForm(f => ({ ...f, ansCompliance: n }))}>
+                    <Text style={[styles.complianceBtnText, editTaskForm.ansCompliance === n && styles.complianceBtnTextActive]}>{n}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
+          <Text style={styles.inputLabel}>Observaciones</Text>
+          <TextInput style={[styles.input, { minHeight: 60 }]} value={editTaskForm.observations ?? ""} onChangeText={v => setEditTaskForm(f => ({ ...f, observations: v }))} placeholder="Observaciones adicionales..." placeholderTextColor="#9CA3AF" multiline />
+          <View style={styles.modalActions}>
+            <TouchableOpacity style={styles.cancelModalBtn} onPress={() => { setShowEditTaskModal(false); setEditingTaskId(null); setEditTaskForm(EMPTY_TASK); setEditTaskErrors([]); }}>
+              <Text style={styles.cancelModalText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.saveModalBtn} onPress={handleSaveEditTask} disabled={updateTask.isPending}>
+              {updateTask.isPending ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.saveModalText}>Guardar</Text>}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardModal>
+
+      {/* Edit Strength Modal */}
+      <KeyboardModal
+        visible={showEditStrengthModal}
+        onClose={() => { setShowEditStrengthModal(false); setEditingStrengthId(null); setEditStrengthText(""); }}
+        title="Editar Fortaleza u Oportunidad"
+      >
+        <View style={styles.modalPadding}>
+          <Text style={styles.inputLabel}>Tipo</Text>
+          <View style={styles.strengthTypeSelector}>
+            <TouchableOpacity style={[styles.strengthTypeBtn, editStrengthType === "fortaleza" && { backgroundColor: "#5CB85C", borderColor: "#5CB85C" }]} onPress={() => setEditStrengthType("fortaleza")}>
+              <Text style={[styles.strengthTypeBtnText, editStrengthType === "fortaleza" && { color: "#FFF" }]}>💪 Fortaleza</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.strengthTypeBtn, editStrengthType === "oportunidad" && { backgroundColor: "#F5A623", borderColor: "#F5A623" }]} onPress={() => setEditStrengthType("oportunidad")}>
+              <Text style={[styles.strengthTypeBtnText, editStrengthType === "oportunidad" && { color: "#FFF" }]}>💡 Oportunidad</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.inputLabel}>Descripción</Text>
+          <TextInput style={[styles.input, { minHeight: 80 }]} value={editStrengthText} onChangeText={setEditStrengthText} placeholder="Describe la fortaleza u oportunidad..." placeholderTextColor="#9CA3AF" multiline autoFocus />
+          <View style={styles.modalActions}>
+            <TouchableOpacity style={styles.cancelModalBtn} onPress={() => { setShowEditStrengthModal(false); setEditingStrengthId(null); setEditStrengthText(""); }}>
+              <Text style={styles.cancelModalText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.saveModalBtn} onPress={handleSaveEditStrength} disabled={updateStrength.isPending}>
+              {updateStrength.isPending ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.saveModalText}>Guardar</Text>}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardModal>
     </ScreenContainer>
   );
 }
@@ -595,6 +772,7 @@ const styles = StyleSheet.create({
   interactionDot: { width: 10, height: 10, borderRadius: 5, marginRight: 10 },
   interactionName: { flex: 1, fontSize: 15, fontWeight: "700", color: "#1A1A2E" },
   interactionActions: { flexDirection: "row", alignItems: "center", gap: 10 },
+  editIcon: { fontSize: 16, padding: 4 },
   deleteIcon: { fontSize: 16, padding: 4 },
   chevron: { fontSize: 12, color: "#9CA3AF" },
   interactionBody: { borderTopWidth: 1, borderTopColor: "#F3F4F6", padding: 14 },
