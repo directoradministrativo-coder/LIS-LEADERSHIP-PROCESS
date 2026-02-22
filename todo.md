@@ -495,3 +495,11 @@
 - [x] Cambiar color del texto de descripción de tareas en vista expandida admin: #1D3557 (nombre) + #4B5563 (meta)
 - [x] Cambiar color del texto de fortalezas en vista expandida admin: #1D3557
 - [x] Cambiar color del texto de oportunidades en vista expandida admin: #1D3557
+
+## Bug v31 — Error toISOString y fallo revertir en historial (app nativa)
+
+- [x] Causa raíz: campos de fecha (createdAt, updatedAt) guardados como strings ISO en oldData/newData del audit log; Drizzle espera objetos Date
+- [x] Fix: Función sanitizeRestoreFields() que convierte strings ISO a Date y excluye campos auto-generados (id, createdAt, updatedAt)
+- [x] Aplicado a TODOS los cases de UPDATE en restoreAuditRecord (kpis, projects, orgCollaborators, orgHierarchies, interactionTasks, interactionStrengths, collaboratorFunctions, processInteractions)
+- [x] Aplicado a TODOS los cases de DELETE (insert) en restoreAuditRecord con cast as any para compatibilidad de tipos
+- [x] Corregidas variables no definidas (cId → collabId, iId → interactionId) en cases de orgCollaborators y processInteractions

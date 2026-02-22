@@ -1242,6 +1242,26 @@ export async function getProjectsExportData(userId: number) {
 
 // ─── Restore from Audit Log ───────────────────────────────────────────────────
 
+/**
+ * Sanitize fields from JSON snapshot before passing to Drizzle update/insert.
+ * - Converts ISO date strings to Date objects for timestamp columns
+ * - Removes auto-generated fields (id, createdAt, updatedAt) that shouldn't be set manually
+ */
+function sanitizeRestoreFields(fields: Record<string, any>, removeTimestamps = true): Record<string, any> {
+  const autoFields = removeTimestamps ? ["id", "createdAt", "updatedAt"] : ["id"];
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(fields)) {
+    if (autoFields.includes(key)) continue;
+    // Convert ISO date strings to Date objects
+    if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) {
+      result[key] = new Date(value);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
 export async function restoreAuditRecord(
   auditId: number,
   ctx: { userId?: number; userName?: string; userEmail?: string } = {}
@@ -1259,44 +1279,44 @@ export async function restoreAuditRecord(
   if (record.action === "update") {
     if (!record.oldData) throw new Error("No previous snapshot available for this update");
     const oldData = JSON.parse(record.oldData);
-    const { id, ...fieldsToRestore } = oldData;
+    const fieldsToRestore = sanitizeRestoreFields(oldData);
     const recordId = record.recordId;
 
     const currentData = JSON.parse(record.newData ?? "{}");
     switch (record.tableName) {
       case "kpis":
-        await db.update(kpis).set(fieldsToRestore).where(eq(kpis.id, recordId));
+        await db.update(kpis).set(sanitizeRestoreFields(fieldsToRestore, false)).where(eq(kpis.id, recordId));
         await writeAuditLog("kpis", recordId, "update", currentData, fieldsToRestore,
           `Admin revirtió KPI al estado anterior desde historial`, ctx);
         break;
       case "projects":
-        await db.update(projects).set({ ...fieldsToRestore, hasNotification: true, notificationMessage: "El administrador revirtió cambios en este proyecto" }).where(eq(projects.id, recordId));
+        await db.update(projects).set({ ...sanitizeRestoreFields(fieldsToRestore, false), hasNotification: true, notificationMessage: "El administrador revirtió cambios en este proyecto" }).where(eq(projects.id, recordId));
         await writeAuditLog("projects", recordId, "update", currentData, fieldsToRestore,
           `Admin revirtió proyecto al estado anterior desde historial`, ctx);
         break;
       case "orgCollaborators":
-        await db.update(orgCollaborators).set(fieldsToRestore).where(eq(orgCollaborators.id, recordId));
+        await db.update(orgCollaborators).set(sanitizeRestoreFields(fieldsToRestore, false)).where(eq(orgCollaborators.id, recordId));
         await writeAuditLog("orgCollaborators", recordId, "update", currentData, fieldsToRestore,
           `Admin revirtió colaborador al estado anterior desde historial`, ctx);
         break;
       case "orgHierarchies":
-        await db.update(orgHierarchies).set(fieldsToRestore).where(eq(orgHierarchies.id, recordId));
+        await db.update(orgHierarchies).set(sanitizeRestoreFields(fieldsToRestore, false)).where(eq(orgHierarchies.id, recordId));
         await writeAuditLog("orgHierarchies", recordId, "update", currentData, fieldsToRestore,
           `Admin revirtió cargo/nivel al estado anterior desde historial`, ctx);
         break;
       case "interactionTasks":
       case "kpiValues":
-        await db.update(interactionTasks).set(fieldsToRestore).where(eq(interactionTasks.id, recordId));
+        await db.update(interactionTasks).set(sanitizeRestoreFields(fieldsToRestore, false)).where(eq(interactionTasks.id, recordId));
         await writeAuditLog("interactionTasks", recordId, "update", currentData, fieldsToRestore,
           `Admin revirtió tarea al estado anterior desde historial`, ctx);
         break;
       case "interactionStrengths":
-        await db.update(interactionStrengths).set(fieldsToRestore).where(eq(interactionStrengths.id, recordId));
+        await db.update(interactionStrengths).set(sanitizeRestoreFields(fieldsToRestore, false)).where(eq(interactionStrengths.id, recordId));
         await writeAuditLog("interactionStrengths", recordId, "update", currentData, fieldsToRestore,
           `Admin revirtió fortaleza/oportunidad al estado anterior desde historial`, ctx);
         break;
       case "collaboratorFunctions":
-        await db.update(collaboratorFunctions).set(fieldsToRestore).where(eq(collaboratorFunctions.id, recordId));
+        await db.update(collaboratorFunctions).set(sanitizeRestoreFields(fieldsToRestore, false)).where(eq(collaboratorFunctions.id, recordId));
         await writeAuditLog("collaboratorFunctions", recordId, "update", currentData, fieldsToRestore,
           `Admin revirtió función al estado anterior desde historial`, ctx);
         break;
@@ -1314,7 +1334,7 @@ export async function restoreAuditRecord(
         break;
       }
       case "processInteractions":
-        await db.update(processInteractions).set(fieldsToRestore).where(eq(processInteractions.id, recordId));
+        await db.update(processInteractions).set(sanitizeRestoreFields(fieldsToRestore, false)).where(eq(processInteractions.id, recordId));
         await writeAuditLog("processInteractions", recordId, "update", currentData, fieldsToRestore,
           `Admin revirtió interacción al estado anterior desde historial`, ctx);
         break;
@@ -1385,15 +1405,15 @@ export async function restoreAuditRecord(
   // Restore based on tableName
   switch (record.tableName) {
     case "kpis": {
-      const { id, ...rest } = oldData;
-      await db.insert(kpis).values(rest);
+      const rest = sanitizeRestoreFields(oldData);
+      await db.insert(kpis).values(rest as any);
       await writeAuditLog("kpis", record.recordId, "create", null, rest,
         `Admin restauró KPI "${rest.name}" desde historial`, ctx);
       break;
     }
     case "projects": {
-      const { id, ...rest } = oldData;
-      await db.insert(projects).values({ ...rest, status: rest.status ?? "por_priorizar", hasNotification: false });
+      const rest = sanitizeRestoreFields(oldData);
+      await db.insert(projects).values({ ...rest, status: rest.status ?? "por_priorizar", hasNotification: false } as any);
       await writeAuditLog("projects", record.recordId, "create", null, rest,
         `Admin restauró proyecto "${rest.name}" desde historial`, ctx);
       break;
@@ -1401,23 +1421,25 @@ export async function restoreAuditRecord(
     case "orgHierarchies": {
       // Restore hierarchy + collaborators + functions
       const { hierarchy, collaborators = [], functions = [] } = oldData;
-      const { id: hId, ...hRest } = hierarchy;
-      await db.insert(orgHierarchies).values(hRest);
+      const hId = hierarchy.id;
+      const hRest = sanitizeRestoreFields(hierarchy);
+      await db.insert(orgHierarchies).values(hRest as any);
       // Get the new hierarchy id
       const newH = await db.select().from(orgHierarchies)
         .where(and(eq(orgHierarchies.processId, hRest.processId), eq(orgHierarchies.name, hRest.name)))
         .limit(1);
       const newHId = newH[0]?.id ?? hId;
       for (const collab of collaborators) {
-        const { id: cId, ...cRest } = collab;
-        await db.insert(orgCollaborators).values({ ...cRest, hierarchyId: newHId });
+        const cId = collab.id;
+        const cRest = sanitizeRestoreFields(collab);
+        await db.insert(orgCollaborators).values({ ...cRest, hierarchyId: newHId } as any);
         const newC = await db.select().from(orgCollaborators)
           .where(and(eq(orgCollaborators.hierarchyId, newHId), eq(orgCollaborators.name, cRest.name)))
           .limit(1);
         const newCId = newC[0]?.id ?? cId;
         for (const fn of functions.filter((f: any) => f.collaboratorId === cId)) {
-          const { id: fId, ...fRest } = fn;
-          await db.insert(collaboratorFunctions).values({ ...fRest, collaboratorId: newCId });
+          const fRest = sanitizeRestoreFields(fn);
+          await db.insert(collaboratorFunctions).values({ ...fRest, collaboratorId: newCId } as any);
         }
       }
       await writeAuditLog("orgHierarchies", record.recordId, "create", null, hierarchy,
@@ -1426,15 +1448,16 @@ export async function restoreAuditRecord(
     }
     case "orgCollaborators": {
       const { collaborator, functions: fns = [] } = oldData;
-      const { id: cId, ...cRest } = collaborator;
-      await db.insert(orgCollaborators).values(cRest);
+      const collabId = collaborator.id;
+      const cRest = sanitizeRestoreFields(collaborator);
+      await db.insert(orgCollaborators).values(cRest as any);
       const newC = await db.select().from(orgCollaborators)
         .where(and(eq(orgCollaborators.hierarchyId, cRest.hierarchyId), eq(orgCollaborators.name, cRest.name)))
         .limit(1);
-      const newCId = newC[0]?.id ?? cId;
+      const newCId = newC[0]?.id ?? collabId;
       for (const fn of fns) {
-        const { id: fId, ...fRest } = fn;
-        await db.insert(collaboratorFunctions).values({ ...fRest, collaboratorId: newCId });
+        const fRest = sanitizeRestoreFields(fn);
+        await db.insert(collaboratorFunctions).values({ ...fRest, collaboratorId: newCId } as any);
       }
       await writeAuditLog("orgCollaborators", record.recordId, "create", null, collaborator,
         `Admin restauró colaborador "${collaborator.name}" desde historial`, ctx);
@@ -1442,19 +1465,20 @@ export async function restoreAuditRecord(
     }
     case "processInteractions": {
       const { interaction, tasks = [], strengths = [] } = oldData;
-      const { id: iId, ...iRest } = interaction;
-      await db.insert(processInteractions).values(iRest);
+      const interactionId = interaction.id;
+      const iRest = sanitizeRestoreFields(interaction);
+      await db.insert(processInteractions).values(iRest as any);
       const newI = await db.select().from(processInteractions)
         .where(and(eq(processInteractions.processId, iRest.processId), eq(processInteractions.relatedProcessName, iRest.relatedProcessName)))
         .limit(1);
-      const newIId = newI[0]?.id ?? iId;
+      const newIId = newI[0]?.id ?? interactionId;
       for (const task of tasks) {
-        const { id: tId, ...tRest } = task;
-        await db.insert(interactionTasks).values({ ...tRest, interactionId: newIId });
+        const tRest = sanitizeRestoreFields(task);
+        await db.insert(interactionTasks).values({ ...tRest, interactionId: newIId } as any);
       }
       for (const str of strengths) {
-        const { id: sId, ...sRest } = str;
-        await db.insert(interactionStrengths).values({ ...sRest, interactionId: newIId });
+        const sRest = sanitizeRestoreFields(str);
+        await db.insert(interactionStrengths).values({ ...sRest, interactionId: newIId } as any);
       }
       await writeAuditLog("processInteractions", record.recordId, "create", null, interaction,
         `Admin restauró interacción con "${interaction.relatedProcessName}" desde historial`, ctx);
