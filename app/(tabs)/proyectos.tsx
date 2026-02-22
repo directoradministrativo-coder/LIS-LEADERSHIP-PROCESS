@@ -5,12 +5,12 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Modal,
   StyleSheet,
   Alert,
   ActivityIndicator,
   FlatList,
 } from "react-native";
+import { KeyboardModal } from "@/components/keyboard-modal";
 import { ScreenContainer } from "@/components/screen-container";
 import { trpc } from "@/lib/trpc";
 import { useLisRole } from "./_layout";
@@ -378,84 +378,69 @@ export default function ProyectosScreen() {
       )}
 
       {/* Form Modal */}
-      <Modal visible={showForm} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.modalTitle}>
-                {editingProject ? "Editar Proyecto" : "Nuevo Proyecto"}
-              </Text>
-
-              <Text style={styles.fieldLabel}>Nombre del Proyecto *</Text>
-              <TextInput
-                style={styles.input}
-                value={name}
-                onChangeText={setName}
-                placeholder="Ej: Implementación de sistema ERP"
-                placeholderTextColor="#9CA3AF"
-                maxLength={255}
-              />
-
-              <Text style={styles.fieldLabel}>Descripción *</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={description}
-                onChangeText={setDescription}
-                placeholder="Describe el proyecto, sus objetivos y alcance..."
-                placeholderTextColor="#9CA3AF"
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-
-              <Text style={styles.fieldLabel}>
-                Impacto: <Text style={{ color: LIS_RED, fontWeight: "700" }}>{impact}</Text> — {IMPACT_LABELS[impact]}
-              </Text>
-              <Text style={styles.fieldHint}>¿Qué tan grande es el beneficio si se ejecuta?</Text>
-              <RatingSelector value={impact} onChange={setImpact} labels={IMPACT_LABELS} color={LIS_RED} />
-
-              <Text style={[styles.fieldLabel, { marginTop: 16 }]}>
-                Dificultad: <Text style={{ color: LIS_BLUE, fontWeight: "700" }}>{difficulty}</Text> — {DIFFICULTY_LABELS[difficulty]}
-              </Text>
-              <Text style={styles.fieldHint}>¿Qué tan complejo es implementarlo?</Text>
-              <RatingSelector value={difficulty} onChange={setDifficulty} labels={DIFFICULTY_LABELS} color={LIS_BLUE} />
-
-              <View style={[styles.scorePreview, { borderColor: subtotalColor }]}>
-                <Text style={styles.scorePreviewLabel}>Score calculado</Text>
-                <Text style={[styles.scorePreviewValue, { color: subtotalColor }]}>
-                  {impact} × {difficulty} = {subtotalPreview}
-                </Text>
-                <Text style={styles.scorePreviewHint}>
-                  {subtotalPreview >= 20
-                    ? "Prioridad Crítica"
-                    : subtotalPreview >= 12
-                    ? "Prioridad Alta"
-                    : subtotalPreview >= 6
-                    ? "Prioridad Media"
-                    : "Prioridad Baja"}
-                </Text>
-              </View>
-
-              <View style={styles.modalActions}>
-                <TouchableOpacity style={styles.cancelBtn} onPress={resetForm}>
-                  <Text style={styles.cancelBtnText}>Cancelar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.saveBtn, (createMutation.isPending || updateMutation.isPending) && styles.saveBtnDisabled]}
-                  onPress={handleSave}
-                  disabled={createMutation.isPending || updateMutation.isPending}
-                >
-                  {createMutation.isPending || updateMutation.isPending ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Text style={styles.saveBtnText}>{editingProject ? "Actualizar" : "Guardar"}</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
+      <KeyboardModal
+        visible={showForm}
+        onClose={resetForm}
+        title={editingProject ? "Editar Proyecto" : "Nuevo Proyecto"}
+      >
+        <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
+          <Text style={styles.fieldLabel}>Nombre del Proyecto *</Text>
+          <TextInput
+            style={styles.input}
+            value={name}
+            onChangeText={setName}
+            placeholder="Ej: Implementación de sistema ERP"
+            placeholderTextColor="#9CA3AF"
+            maxLength={255}
+          />
+          <Text style={styles.fieldLabel}>Descripción *</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Describe el proyecto, sus objetivos y alcance..."
+            placeholderTextColor="#9CA3AF"
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+          />
+          <Text style={styles.fieldLabel}>
+            Impacto: <Text style={{ color: LIS_RED, fontWeight: "700" }}>{impact}</Text> — {IMPACT_LABELS[impact]}
+          </Text>
+          <Text style={styles.fieldHint}>¿Qué tan grande es el beneficio si se ejecuta?</Text>
+          <RatingSelector value={impact} onChange={setImpact} labels={IMPACT_LABELS} color={LIS_RED} />
+          <Text style={[styles.fieldLabel, { marginTop: 16 }]}>
+            Dificultad: <Text style={{ color: LIS_BLUE, fontWeight: "700" }}>{difficulty}</Text> — {DIFFICULTY_LABELS[difficulty]}
+          </Text>
+          <Text style={styles.fieldHint}>¿Qué tan complejo es implementarlo?</Text>
+          <RatingSelector value={difficulty} onChange={setDifficulty} labels={DIFFICULTY_LABELS} color={LIS_BLUE} />
+          <View style={[styles.scorePreview, { borderColor: subtotalColor }]}>
+            <Text style={styles.scorePreviewLabel}>Score calculado</Text>
+            <Text style={[styles.scorePreviewValue, { color: subtotalColor }]}>
+              {impact} × {difficulty} = {subtotalPreview}
+            </Text>
+            <Text style={styles.scorePreviewHint}>
+              {subtotalPreview >= 20 ? "Prioridad Crítica" : subtotalPreview >= 12 ? "Prioridad Alta" : subtotalPreview >= 6 ? "Prioridad Media" : "Prioridad Baja"}
+            </Text>
+          </View>
+          <View style={styles.modalActions}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={resetForm}>
+              <Text style={styles.cancelBtnText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.saveBtn, (createMutation.isPending || updateMutation.isPending) && styles.saveBtnDisabled]}
+              onPress={handleSave}
+              disabled={createMutation.isPending || updateMutation.isPending}
+            >
+              {createMutation.isPending || updateMutation.isPending ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.saveBtnText}>{editingProject ? "Actualizar" : "Guardar"}</Text>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      </KeyboardModal>
     </ScreenContainer>
   );
 }

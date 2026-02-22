@@ -1,6 +1,6 @@
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
-  Alert, ActivityIndicator
+  Alert, ActivityIndicator, KeyboardAvoidingView, Platform
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { trpc } from "@/lib/trpc";
@@ -379,6 +379,7 @@ export default function DofaScreen() {
   const isAdmin = lisRole === "admin" || lisRole === "superadmin";
 
   return (
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}>
     <ScreenContainer containerClassName="bg-background">
       {/* Header */}
       <View style={styles.header}>
@@ -398,6 +399,7 @@ export default function DofaScreen() {
 
       {isAdmin ? <AdminDofaView /> : <UserDofaView />}
     </ScreenContainer>
+    </KeyboardAvoidingView>
   );
 }
 

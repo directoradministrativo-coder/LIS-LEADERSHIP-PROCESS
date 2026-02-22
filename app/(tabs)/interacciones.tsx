@@ -1,7 +1,8 @@
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
-  Alert, ActivityIndicator, Modal, FlatList
+  Alert, ActivityIndicator, FlatList
 } from "react-native";
+import { KeyboardModal } from "@/components/keyboard-modal";
 import { ScreenContainer } from "@/components/screen-container";
 import { trpc } from "@/lib/trpc";
 import { useState, useMemo } from "react";
@@ -451,175 +452,123 @@ export default function InteraccionesScreen() {
       </ScrollView>
 
       {/* Add Interaction Modal */}
-      <Modal visible={showAddInteraction} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              Agregar {activeType === "proveedor" ? "Proveedor" : "Cliente"}
-            </Text>
-              <Text style={styles.inputLabel}>Nombre del Proceso *</Text>
-            {interactionNameError ? <Text style={styles.fieldError}>{interactionNameError}</Text> : null}
-            <TextInput
-              style={[styles.input, interactionNameError ? styles.inputError : null]}
-              value={newInteractionName}
-              onChangeText={v => { setNewInteractionName(v); setInteractionNameError(""); }}
-              placeholder={activeType === "proveedor" ? "Ej: Proceso de Compras" : "Ej: Proceso de Ventas"}
-              placeholderTextColor="#9CA3AF"
-              autoFocus
-            />
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelModalBtn} onPress={() => { setShowAddInteraction(false); setNewInteractionName(""); }}>
-                <Text style={styles.cancelModalText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.saveModalBtn, { backgroundColor: config.color }]} onPress={handleAddInteraction} disabled={createInteraction.isPending}>
-                {createInteraction.isPending ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.saveModalText}>Agregar</Text>}
-              </TouchableOpacity>
-            </View>
+      <KeyboardModal
+        visible={showAddInteraction}
+        onClose={() => { setShowAddInteraction(false); setNewInteractionName(""); }}
+        title={`Agregar ${activeType === "proveedor" ? "Proveedor" : "Cliente"}`}
+      >
+        <View style={styles.modalPadding}>
+          <Text style={styles.inputLabel}>Nombre del Proceso *</Text>
+          {interactionNameError ? <Text style={styles.fieldError}>{interactionNameError}</Text> : null}
+          <TextInput
+            style={[styles.input, interactionNameError ? styles.inputError : null]}
+            value={newInteractionName}
+            onChangeText={v => { setNewInteractionName(v); setInteractionNameError(""); }}
+            placeholder={activeType === "proveedor" ? "Ej: Proceso de Compras" : "Ej: Proceso de Ventas"}
+            placeholderTextColor="#9CA3AF"
+            autoFocus
+          />
+          <View style={styles.modalActions}>
+            <TouchableOpacity style={styles.cancelModalBtn} onPress={() => { setShowAddInteraction(false); setNewInteractionName(""); }}>
+              <Text style={styles.cancelModalText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.saveModalBtn, { backgroundColor: config.color }]} onPress={handleAddInteraction} disabled={createInteraction.isPending}>
+              {createInteraction.isPending ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.saveModalText}>Agregar</Text>}
+            </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      </KeyboardModal>
 
       {/* Add Task Modal */}
-      <Modal visible={showTaskModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <ScrollView style={{ maxHeight: "90%" }}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Nueva Tarea / Actividad</Text>
-
-              {taskErrors.length > 0 && (
-                <View style={styles.errorBox}>
-                  <Text style={styles.errorTitle}>⚠️ Campos obligatorios incompletos:</Text>
-                  {taskErrors.map((e, i) => <Text key={i} style={styles.errorItem}>{e}</Text>)}
+      <KeyboardModal
+        visible={showTaskModal}
+        onClose={() => { setShowTaskModal(false); setTaskForm(EMPTY_TASK); setTaskErrors([]); }}
+        title="Nueva Tarea / Actividad"
+      >
+        <View style={styles.modalPadding}>
+          {taskErrors.length > 0 && (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorTitle}>⚠️ Campos obligatorios incompletos:</Text>
+              {taskErrors.map((e, i) => <Text key={i} style={styles.errorItem}>{e}</Text>)}
+            </View>
+          )}
+          <Text style={styles.inputLabel}>Tarea / Actividad *</Text>
+          <TextInput style={[styles.input, { minHeight: 60 }, taskErrors.some(e => e.includes("Tarea")) && styles.inputError]} value={taskForm.taskActivity} onChangeText={v => setTaskForm(f => ({ ...f, taskActivity: v }))} placeholder="Describe la tarea o actividad" placeholderTextColor="#9CA3AF" multiline />
+          <Text style={styles.inputLabel}>Documento / Ruta *</Text>
+          <TextInput style={[styles.input, taskErrors.some(e => e.includes("Documento")) && styles.inputError]} value={taskForm.documentRoute} onChangeText={v => setTaskForm(f => ({ ...f, documentRoute: v }))} placeholder="Ej: Formato FO-LOG-001" placeholderTextColor="#9CA3AF" />
+          <Text style={styles.inputLabel}>Responsable *</Text>
+          <TextInput style={[styles.input, taskErrors.some(e => e.includes("Responsable")) && styles.inputError]} value={taskForm.responsibleRole} onChangeText={v => setTaskForm(f => ({ ...f, responsibleRole: v }))} placeholder="Ej: Coordinador de Logística" placeholderTextColor="#9CA3AF" />
+          <Text style={styles.sectionSubTitle}>ANS (Acuerdo de Nivel de Servicio)</Text>
+          <TouchableOpacity style={[styles.checkRow, taskForm.ansUndefined && styles.checkRowActive]} onPress={() => setTaskForm(f => ({ ...f, ansUndefined: !f.ansUndefined }))}>
+            <View style={[styles.checkbox, taskForm.ansUndefined && styles.checkboxActive]}>
+              {taskForm.ansUndefined && <Text style={styles.checkmark}>✓</Text>}
+            </View>
+            <Text style={styles.checkLabel}>ANS No Definido</Text>
+          </TouchableOpacity>
+          {!taskForm.ansUndefined && (
+            <>
+              <Text style={styles.inputLabel}>Tiempo de Respuesta</Text>
+              <View style={styles.ansRow}>
+                <TextInput style={[styles.input, { flex: 1 }]} value={taskForm.ansNumber?.toString() ?? ""} onChangeText={v => setTaskForm(f => ({ ...f, ansNumber: parseInt(v) || undefined }))} placeholder="1-9" placeholderTextColor="#9CA3AF" keyboardType="number-pad" />
+                <View style={styles.ansTypeSelector}>
+                  {ANS_TYPES.map(t => (
+                    <TouchableOpacity key={t.value} style={[styles.ansTypeBtn, taskForm.ansType === t.value && styles.ansTypeBtnActive]} onPress={() => setTaskForm(f => ({ ...f, ansType: t.value }))}>
+                      <Text style={[styles.ansTypeBtnText, taskForm.ansType === t.value && styles.ansTypeBtnTextActive]}>{t.label}</Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
-              )}
-
-              <Text style={styles.inputLabel}>Tarea / Actividad *</Text>
-              <TextInput style={[styles.input, { minHeight: 60 }, taskErrors.some(e => e.includes("Tarea")) && styles.inputError]} value={taskForm.taskActivity} onChangeText={v => setTaskForm(f => ({ ...f, taskActivity: v }))} placeholder="Describe la tarea o actividad" placeholderTextColor="#9CA3AF" multiline />
-
-              <Text style={styles.inputLabel}>Documento / Ruta *</Text>
-              <TextInput style={[styles.input, taskErrors.some(e => e.includes("Documento")) && styles.inputError]} value={taskForm.documentRoute} onChangeText={v => setTaskForm(f => ({ ...f, documentRoute: v }))} placeholder="Ej: Formato FO-LOG-001" placeholderTextColor="#9CA3AF" />
-
-              <Text style={styles.inputLabel}>Responsable *</Text>
-              <TextInput style={[styles.input, taskErrors.some(e => e.includes("Responsable")) && styles.inputError]} value={taskForm.responsibleRole} onChangeText={v => setTaskForm(f => ({ ...f, responsibleRole: v }))} placeholder="Ej: Coordinador de Logística" placeholderTextColor="#9CA3AF" />
-
-              <Text style={styles.sectionSubTitle}>ANS (Acuerdo de Nivel de Servicio)</Text>
-
-              <TouchableOpacity
-                style={[styles.checkRow, taskForm.ansUndefined && styles.checkRowActive]}
-                onPress={() => setTaskForm(f => ({ ...f, ansUndefined: !f.ansUndefined }))}
-              >
-                <View style={[styles.checkbox, taskForm.ansUndefined && styles.checkboxActive]}>
-                  {taskForm.ansUndefined && <Text style={styles.checkmark}>✓</Text>}
-                </View>
-                <Text style={styles.checkLabel}>ANS No Definido</Text>
-              </TouchableOpacity>
-
-              {!taskForm.ansUndefined && (
-                <>
-                  <Text style={styles.inputLabel}>Tiempo de Respuesta</Text>
-                  <View style={styles.ansRow}>
-                    <TextInput
-                      style={[styles.input, { flex: 1 }]}
-                      value={taskForm.ansNumber?.toString() ?? ""}
-                      onChangeText={v => setTaskForm(f => ({ ...f, ansNumber: parseInt(v) || undefined }))}
-                      placeholder="1-9"
-                      placeholderTextColor="#9CA3AF"
-                      keyboardType="number-pad"
-                    />
-                    <View style={styles.ansTypeSelector}>
-                      {ANS_TYPES.map(t => (
-                        <TouchableOpacity
-                          key={t.value}
-                          style={[styles.ansTypeBtn, taskForm.ansType === t.value && styles.ansTypeBtnActive]}
-                          onPress={() => setTaskForm(f => ({ ...f, ansType: t.value }))}
-                        >
-                          <Text style={[styles.ansTypeBtnText, taskForm.ansType === t.value && styles.ansTypeBtnTextActive]}>
-                            {t.label}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  </View>
-
-                  <Text style={styles.inputLabel}>Nivel de Cumplimiento (1-5)</Text>
-                  <View style={styles.complianceSelector}>
-                    {[1, 2, 3, 4, 5].map(n => (
-                      <TouchableOpacity
-                        key={n}
-                        style={[styles.complianceBtn, taskForm.ansCompliance === n && styles.complianceBtnActive]}
-                        onPress={() => setTaskForm(f => ({ ...f, ansCompliance: n }))}
-                      >
-                        <Text style={[styles.complianceBtnText, taskForm.ansCompliance === n && styles.complianceBtnTextActive]}>{n}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </>
-              )}
-
-              <Text style={styles.inputLabel}>Observaciones</Text>
-              <TextInput
-                style={[styles.input, { minHeight: 60 }]}
-                value={taskForm.observations ?? ""}
-                onChangeText={v => setTaskForm(f => ({ ...f, observations: v }))}
-                placeholder="Observaciones adicionales sobre esta tarea..."
-                placeholderTextColor="#9CA3AF"
-                multiline
-              />
-
-              <View style={styles.modalActions}>
-                <TouchableOpacity style={styles.cancelModalBtn} onPress={() => { setShowTaskModal(false); setTaskForm(EMPTY_TASK); setTaskErrors([]); }}>
-                  <Text style={styles.cancelModalText}>Cancelar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.saveModalBtn} onPress={handleAddTask} disabled={createTask.isPending}>
-                  {createTask.isPending ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.saveModalText}>Guardar</Text>}
-                </TouchableOpacity>
               </View>
-            </View>
-          </ScrollView>
-        </View>
-      </Modal>
-
-      {/* Add Strength Modal */}
-      <Modal visible={showStrengthModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Agregar Fortaleza u Oportunidad</Text>
-            <Text style={styles.inputLabel}>Tipo</Text>
-            <View style={styles.strengthTypeSelector}>
-              <TouchableOpacity
-                style={[styles.strengthTypeBtn, newStrengthType === "fortaleza" && { backgroundColor: "#5CB85C", borderColor: "#5CB85C" }]}
-                onPress={() => setNewStrengthType("fortaleza")}
-              >
-                <Text style={[styles.strengthTypeBtnText, newStrengthType === "fortaleza" && { color: "#FFF" }]}>💪 Fortaleza</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.strengthTypeBtn, newStrengthType === "oportunidad" && { backgroundColor: "#F5A623", borderColor: "#F5A623" }]}
-                onPress={() => setNewStrengthType("oportunidad")}
-              >
-                <Text style={[styles.strengthTypeBtnText, newStrengthType === "oportunidad" && { color: "#FFF" }]}>💡 Oportunidad</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.inputLabel}>Descripción</Text>
-            <TextInput
-              style={[styles.input, { minHeight: 80 }]}
-              value={newStrengthText}
-              onChangeText={setNewStrengthText}
-              placeholder="Describe la fortaleza u oportunidad..."
-              placeholderTextColor="#9CA3AF"
-              multiline
-              autoFocus
-            />
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelModalBtn} onPress={() => { setShowStrengthModal(false); setNewStrengthText(""); }}>
-                <Text style={styles.cancelModalText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.saveModalBtn} onPress={handleAddStrength} disabled={createStrength.isPending}>
-                {createStrength.isPending ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.saveModalText}>Agregar</Text>}
-              </TouchableOpacity>
-            </View>
+              <Text style={styles.inputLabel}>Nivel de Cumplimiento (1-5)</Text>
+              <View style={styles.complianceSelector}>
+                {[1, 2, 3, 4, 5].map(n => (
+                  <TouchableOpacity key={n} style={[styles.complianceBtn, taskForm.ansCompliance === n && styles.complianceBtnActive]} onPress={() => setTaskForm(f => ({ ...f, ansCompliance: n }))}>
+                    <Text style={[styles.complianceBtnText, taskForm.ansCompliance === n && styles.complianceBtnTextActive]}>{n}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
+          <Text style={styles.inputLabel}>Observaciones</Text>
+          <TextInput style={[styles.input, { minHeight: 60 }]} value={taskForm.observations ?? ""} onChangeText={v => setTaskForm(f => ({ ...f, observations: v }))} placeholder="Observaciones adicionales sobre esta tarea..." placeholderTextColor="#9CA3AF" multiline />
+          <View style={styles.modalActions}>
+            <TouchableOpacity style={styles.cancelModalBtn} onPress={() => { setShowTaskModal(false); setTaskForm(EMPTY_TASK); setTaskErrors([]); }}>
+              <Text style={styles.cancelModalText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.saveModalBtn} onPress={handleAddTask} disabled={createTask.isPending}>
+              {createTask.isPending ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.saveModalText}>Guardar</Text>}
+            </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      </KeyboardModal>
+
+      {/* Add Strength Modal */}
+      <KeyboardModal
+        visible={showStrengthModal}
+        onClose={() => { setShowStrengthModal(false); setNewStrengthText(""); }}
+        title="Agregar Fortaleza u Oportunidad"
+      >
+        <View style={styles.modalPadding}>
+          <Text style={styles.inputLabel}>Tipo</Text>
+          <View style={styles.strengthTypeSelector}>
+            <TouchableOpacity style={[styles.strengthTypeBtn, newStrengthType === "fortaleza" && { backgroundColor: "#5CB85C", borderColor: "#5CB85C" }]} onPress={() => setNewStrengthType("fortaleza")}>
+              <Text style={[styles.strengthTypeBtnText, newStrengthType === "fortaleza" && { color: "#FFF" }]}>💪 Fortaleza</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.strengthTypeBtn, newStrengthType === "oportunidad" && { backgroundColor: "#F5A623", borderColor: "#F5A623" }]} onPress={() => setNewStrengthType("oportunidad")}>
+              <Text style={[styles.strengthTypeBtnText, newStrengthType === "oportunidad" && { color: "#FFF" }]}>💡 Oportunidad</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.inputLabel}>Descripción</Text>
+          <TextInput style={[styles.input, { minHeight: 80 }]} value={newStrengthText} onChangeText={setNewStrengthText} placeholder="Describe la fortaleza u oportunidad..." placeholderTextColor="#9CA3AF" multiline autoFocus />
+          <View style={styles.modalActions}>
+            <TouchableOpacity style={styles.cancelModalBtn} onPress={() => { setShowStrengthModal(false); setNewStrengthText(""); }}>
+              <Text style={styles.cancelModalText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.saveModalBtn} onPress={handleAddStrength} disabled={createStrength.isPending}>
+              {createStrength.isPending ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.saveModalText}>Agregar</Text>}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </KeyboardModal>
     </ScreenContainer>
   );
 }
@@ -748,4 +697,5 @@ const styles = StyleSheet.create({
   adminInteractionMeta: { fontSize: 12, color: "#6B7280", marginTop: 2 },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12 },
   loadingText: { fontSize: 14, color: "#6B7280" },
+  modalPadding: { paddingHorizontal: 20, paddingBottom: 8 },
 });

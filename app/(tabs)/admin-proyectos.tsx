@@ -5,12 +5,13 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Modal,
   StyleSheet,
   Alert,
   ActivityIndicator,
   FlatList,
+  Modal,
 } from "react-native";
+import { KeyboardModal } from "@/components/keyboard-modal";
 import { ScreenContainer } from "@/components/screen-container";
 import { trpc } from "@/lib/trpc";
 
@@ -289,112 +290,65 @@ export default function AdminProyectosScreen() {
       )}
 
       {/* Edit Modal */}
-      <Modal visible={!!editingProject} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.modalTitle}>Editar Proyecto</Text>
-              {editingProject && (
+      <KeyboardModal
+        visible={!!editingProject}
+        onClose={() => setEditingProject(null)}
+        title="Editar Proyecto"
+      >
+        <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
+          {editingProject && (
+            <>
+              <Text style={styles.modalProjectName}>{editingProject.name}</Text>
+              <Text style={styles.modalArea}>
+                {editingProject.areaName || editingProject.processName} — {editingProject.leaderName}
+              </Text>
+              <Text style={styles.fieldLabel}>
+                Impacto: <Text style={{ color: LIS_RED, fontWeight: "700" }}>{editImpact}</Text> — {IMPACT_LABELS[editImpact]}
+              </Text>
+              <RatingSelector value={editImpact} onChange={setEditImpact} color={LIS_RED} />
+              <Text style={[styles.fieldLabel, { marginTop: 16 }]}>
+                Dificultad: <Text style={{ color: LIS_BLUE, fontWeight: "700" }}>{editDifficulty}</Text> — {DIFFICULTY_LABELS[editDifficulty]}
+              </Text>
+              <RatingSelector value={editDifficulty} onChange={setEditDifficulty} color={LIS_BLUE} />
+              <View style={[styles.scorePreview, { borderColor: subtotalColor }]}>
+                <Text style={styles.scorePreviewLabel}>Score</Text>
+                <Text style={[styles.scorePreviewValue, { color: subtotalColor }]}>{editImpact} × {editDifficulty} = {subtotalPreview}</Text>
+              </View>
+              <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Estado del Proyecto</Text>
+              <TouchableOpacity style={styles.statusSelector} onPress={() => setShowStatusModal(true)}>
+                <View style={[styles.statusDot, { backgroundColor: STATUS_CONFIG[editStatus].color }]} />
+                <Text style={styles.statusSelectorText}>{STATUS_CONFIG[editStatus].label}</Text>
+                <Text style={styles.statusSelectorArrow}>▼</Text>
+              </TouchableOpacity>
+              {requiresObservations && (
                 <>
-                  <Text style={styles.modalProjectName}>{editingProject.name}</Text>
-                  <Text style={styles.modalArea}>
-                    {editingProject.areaName || editingProject.processName} — {editingProject.leaderName}
+                  <Text style={[styles.fieldLabel, { marginTop: 16, color: LIS_RED }]}>
+                    Observaciones * (requerido para {STATUS_CONFIG[editStatus].label})
                   </Text>
-
-                  <Text style={styles.fieldLabel}>
-                    Impacto: <Text style={{ color: LIS_RED, fontWeight: "700" }}>{editImpact}</Text> — {IMPACT_LABELS[editImpact]}
-                  </Text>
-                  <RatingSelector value={editImpact} onChange={setEditImpact} color={LIS_RED} />
-
-                  <Text style={[styles.fieldLabel, { marginTop: 16 }]}>
-                    Dificultad: <Text style={{ color: LIS_BLUE, fontWeight: "700" }}>{editDifficulty}</Text> — {DIFFICULTY_LABELS[editDifficulty]}
-                  </Text>
-                  <RatingSelector value={editDifficulty} onChange={setEditDifficulty} color={LIS_BLUE} />
-
-                  <View style={[styles.scorePreview, { borderColor: subtotalColor }]}>
-                    <Text style={styles.scorePreviewLabel}>Score</Text>
-                    <Text style={[styles.scorePreviewValue, { color: subtotalColor }]}>
-                      {editImpact} × {editDifficulty} = {subtotalPreview}
-                    </Text>
-                  </View>
-
-                  <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Estado del Proyecto</Text>
-                  <TouchableOpacity
-                    style={styles.statusSelector}
-                    onPress={() => setShowStatusModal(true)}
-                  >
-                    <View style={[styles.statusDot, { backgroundColor: STATUS_CONFIG[editStatus].color }]} />
-                    <Text style={styles.statusSelectorText}>{STATUS_CONFIG[editStatus].label}</Text>
-                    <Text style={styles.statusSelectorArrow}>▼</Text>
-                  </TouchableOpacity>
-
-                  {requiresObservations && (
-                    <>
-                      <Text style={[styles.fieldLabel, { marginTop: 16, color: LIS_RED }]}>
-                        Observaciones * (requerido para {STATUS_CONFIG[editStatus].label})
-                      </Text>
-                      <TextInput
-                        style={[styles.input, styles.textArea]}
-                        value={editObservations}
-                        onChangeText={setEditObservations}
-                        placeholder="Explica el motivo del cambio de estado..."
-                        placeholderTextColor="#9CA3AF"
-                        multiline
-                        numberOfLines={4}
-                        textAlignVertical="top"
-                      />
-                    </>
-                  )}
-
-                  {!requiresObservations && (
-                    <>
-                      <Text style={[styles.fieldLabel, { marginTop: 16 }]}>
-                        Observaciones (opcional)
-                      </Text>
-                      <TextInput
-                        style={[styles.input, styles.textArea]}
-                        value={editObservations}
-                        onChangeText={setEditObservations}
-                        placeholder="Notas adicionales sobre el cambio..."
-                        placeholderTextColor="#9CA3AF"
-                        multiline
-                        numberOfLines={3}
-                        textAlignVertical="top"
-                      />
-                    </>
-                  )}
-
-                  <View style={styles.notifNote}>
-                    <Text style={styles.notifNoteText}>
-                      💬 El líder del área recibirá una notificación en la app sobre los cambios realizados.
-                    </Text>
-                  </View>
-
-                  <View style={styles.modalActions}>
-                    <TouchableOpacity
-                      style={styles.cancelBtn}
-                      onPress={() => setEditingProject(null)}
-                    >
-                      <Text style={styles.cancelBtnText}>Cancelar</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.saveBtn, updateMutation.isPending && styles.saveBtnDisabled]}
-                      onPress={handleSave}
-                      disabled={updateMutation.isPending}
-                    >
-                      {updateMutation.isPending ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <Text style={styles.saveBtnText}>Guardar Cambios</Text>
-                      )}
-                    </TouchableOpacity>
-                  </View>
+                  <TextInput style={[styles.input, styles.textArea]} value={editObservations} onChangeText={setEditObservations} placeholder="Explica el motivo del cambio de estado..." placeholderTextColor="#9CA3AF" multiline numberOfLines={4} textAlignVertical="top" />
                 </>
               )}
-            </ScrollView>
-          </View>
+              {!requiresObservations && (
+                <>
+                  <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Observaciones (opcional)</Text>
+                  <TextInput style={[styles.input, styles.textArea]} value={editObservations} onChangeText={setEditObservations} placeholder="Notas adicionales sobre el cambio..." placeholderTextColor="#9CA3AF" multiline numberOfLines={3} textAlignVertical="top" />
+                </>
+              )}
+              <View style={styles.notifNote}>
+                <Text style={styles.notifNoteText}>💬 El líder del área recibirá una notificación en la app sobre los cambios realizados.</Text>
+              </View>
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditingProject(null)}>
+                  <Text style={styles.cancelBtnText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.saveBtn, updateMutation.isPending && styles.saveBtnDisabled]} onPress={handleSave} disabled={updateMutation.isPending}>
+                  {updateMutation.isPending ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.saveBtnText}>Guardar Cambios</Text>}
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
         </View>
-      </Modal>
+      </KeyboardModal>
 
       {/* Status picker modal */}
       <Modal visible={showStatusModal} animationType="fade" transparent>

@@ -1,8 +1,9 @@
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
-  Alert, ActivityIndicator, Modal, FlatList
+  Alert, ActivityIndicator, FlatList, Platform, KeyboardAvoidingView
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
+import { KeyboardModal } from "@/components/keyboard-modal";
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 
@@ -222,118 +223,126 @@ export default function OrganigramaScreen() {
       </ScrollView>
 
       {/* Add Hierarchy Modal */}
-      <Modal visible={showAddHierarchy} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Agregar Cargo</Text>
-            <Text style={styles.inputLabel}>Nombre del Cargo</Text>
-            <TextInput
-              style={styles.input}
-              value={newHierarchyName}
-              onChangeText={setNewHierarchyName}
-              placeholder="Ej: Director Comercial"
-              placeholderTextColor="#9CA3AF"
-              autoFocus
-            />
-            <Text style={styles.inputLabel}>Nivel Jerárquico</Text>
-            <View style={styles.levelSelector}>
-              {HIERARCHY_LEVELS.map(l => (
-                <TouchableOpacity
-                  key={l.level}
-                  style={[styles.levelOption, newHierarchyLevel === l.level && { backgroundColor: l.color }]}
-                  onPress={() => setNewHierarchyLevel(l.level)}
-                >
-                  <Text style={[styles.levelOptionText, newHierarchyLevel === l.level && { color: "#FFF" }]}>
-                    {l.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelModalBtn} onPress={() => { setShowAddHierarchy(false); setNewHierarchyName(""); }}>
-                <Text style={styles.cancelModalText}>Cancelar</Text>
+      <KeyboardModal
+        visible={showAddHierarchy}
+        onClose={() => { setShowAddHierarchy(false); setNewHierarchyName(""); }}
+        title="Agregar Cargo"
+      >
+        <View style={styles.modalPadding}>
+          <Text style={styles.inputLabel}>Nombre del Cargo</Text>
+          <TextInput
+            style={styles.input}
+            value={newHierarchyName}
+            onChangeText={setNewHierarchyName}
+            placeholder="Ej: Director Comercial"
+            placeholderTextColor="#9CA3AF"
+            autoFocus
+            returnKeyType="done"
+          />
+          <Text style={styles.inputLabel}>Nivel Jerárquico</Text>
+          <View style={styles.levelSelector}>
+            {HIERARCHY_LEVELS.map(l => (
+              <TouchableOpacity
+                key={l.level}
+                style={[styles.levelOption, newHierarchyLevel === l.level && { backgroundColor: l.color }]}
+                onPress={() => setNewHierarchyLevel(l.level)}
+              >
+                <Text style={[styles.levelOptionText, newHierarchyLevel === l.level && { color: "#FFF" }]}>
+                  {l.label}
+                </Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.saveModalBtn} onPress={handleAddHierarchy} disabled={createHierarchy.isPending}>
-                {createHierarchy.isPending ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.saveModalText}>Agregar</Text>}
-              </TouchableOpacity>
-            </View>
+            ))}
+          </View>
+          <View style={styles.modalActions}>
+            <TouchableOpacity style={styles.cancelModalBtn} onPress={() => { setShowAddHierarchy(false); setNewHierarchyName(""); }}>
+              <Text style={styles.cancelModalText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.saveModalBtn} onPress={handleAddHierarchy} disabled={createHierarchy.isPending}>
+              {createHierarchy.isPending ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.saveModalText}>Agregar</Text>}
+            </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      </KeyboardModal>
 
       {/* Add Collaborator Modal */}
-      <Modal visible={showAddCollaborator} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Agregar Persona</Text>
-            <Text style={styles.inputLabel}>Nombre Completo</Text>
-            <TextInput
-              style={styles.input}
-              value={newCollaboratorName}
-              onChangeText={setNewCollaboratorName}
-              placeholder="Ej: Juan Pérez"
-              placeholderTextColor="#9CA3AF"
-              autoFocus
-            />
-            <Text style={styles.inputLabel}>Cargo / Posición (opcional)</Text>
-            <TextInput
-              style={styles.input}
-              value={newCollaboratorPosition}
-              onChangeText={setNewCollaboratorPosition}
-              placeholder="Ej: Director Comercial"
-              placeholderTextColor="#9CA3AF"
-            />
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelModalBtn} onPress={() => { setShowAddCollaborator(false); setNewCollaboratorName(""); setNewCollaboratorPosition(""); }}>
-                <Text style={styles.cancelModalText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.saveModalBtn} onPress={handleAddCollaborator} disabled={createCollaborator.isPending}>
-                {createCollaborator.isPending ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.saveModalText}>Agregar</Text>}
-              </TouchableOpacity>
-            </View>
+      <KeyboardModal
+        visible={showAddCollaborator}
+        onClose={() => { setShowAddCollaborator(false); setNewCollaboratorName(""); setNewCollaboratorPosition(""); }}
+        title="Agregar Persona"
+      >
+        <View style={styles.modalPadding}>
+          <Text style={styles.inputLabel}>Nombre Completo</Text>
+          <TextInput
+            style={styles.input}
+            value={newCollaboratorName}
+            onChangeText={setNewCollaboratorName}
+            placeholder="Ej: Juan Pérez"
+            placeholderTextColor="#9CA3AF"
+            autoFocus
+            returnKeyType="next"
+          />
+          <Text style={styles.inputLabel}>Cargo / Posición (opcional)</Text>
+          <TextInput
+            style={styles.input}
+            value={newCollaboratorPosition}
+            onChangeText={setNewCollaboratorPosition}
+            placeholder="Ej: Director Comercial"
+            placeholderTextColor="#9CA3AF"
+            returnKeyType="done"
+          />
+          <View style={styles.modalActions}>
+            <TouchableOpacity style={styles.cancelModalBtn} onPress={() => { setShowAddCollaborator(false); setNewCollaboratorName(""); setNewCollaboratorPosition(""); }}>
+              <Text style={styles.cancelModalText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.saveModalBtn} onPress={handleAddCollaborator} disabled={createCollaborator.isPending}>
+              {createCollaborator.isPending ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.saveModalText}>Agregar</Text>}
+            </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      </KeyboardModal>
 
       {/* Functions Modal */}
-      <Modal visible={showFunctionsModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: "80%" }]}>
-            <Text style={styles.modalTitle}>Funciones de {selectedCollaborator?.name}</Text>
-            <FlatList
-              data={functionsQuery.data ?? []}
-              keyExtractor={item => String(item.id)}
-              renderItem={({ item }) => (
-                <View style={styles.functionItem}>
-                  <Text style={styles.functionText}>• {item.description}</Text>
-                  <TouchableOpacity onPress={() => deleteFunction.mutate({ id: item.id })}>
-                    <Text style={styles.deleteIcon}>🗑</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-              ListEmptyComponent={<Text style={styles.emptyText}>Sin funciones registradas</Text>}
-              style={{ maxHeight: 200, marginBottom: 12 }}
-            />
-            <Text style={styles.inputLabel}>Nueva Función</Text>
-            <TextInput
-              style={[styles.input, { minHeight: 60 }]}
-              value={newFunctionText}
-              onChangeText={setNewFunctionText}
-              placeholder="Describe la función del colaborador..."
-              placeholderTextColor="#9CA3AF"
-              multiline
-            />
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelModalBtn} onPress={() => { setShowFunctionsModal(false); setNewFunctionText(""); }}>
-                <Text style={styles.cancelModalText}>Cerrar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.saveModalBtn} onPress={handleAddFunction} disabled={createFunction.isPending}>
-                {createFunction.isPending ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.saveModalText}>Agregar</Text>}
-              </TouchableOpacity>
-            </View>
+      <KeyboardModal
+        visible={showFunctionsModal}
+        onClose={() => { setShowFunctionsModal(false); setNewFunctionText(""); }}
+        title={`Funciones de ${selectedCollaborator?.name ?? ""}`}
+      >
+        <View style={styles.modalPadding}>
+          <FlatList
+            data={functionsQuery.data ?? []}
+            keyExtractor={item => String(item.id)}
+            renderItem={({ item }) => (
+              <View style={styles.functionItem}>
+                <Text style={styles.functionText}>• {item.description}</Text>
+                <TouchableOpacity onPress={() => deleteFunction.mutate({ id: item.id })}>
+                  <Text style={styles.deleteIcon}>🗑</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            ListEmptyComponent={<Text style={styles.emptyText}>Sin funciones registradas</Text>}
+            scrollEnabled={false}
+            style={{ marginBottom: 12 }}
+          />
+          <Text style={styles.inputLabel}>NUEVA FUNCIÓN</Text>
+          <TextInput
+            style={[styles.input, { minHeight: 60 }]}
+            value={newFunctionText}
+            onChangeText={setNewFunctionText}
+            placeholder="Describe la función del colaborador..."
+            placeholderTextColor="#9CA3AF"
+            multiline
+            returnKeyType="done"
+          />
+          <View style={styles.modalActions}>
+            <TouchableOpacity style={styles.cancelModalBtn} onPress={() => { setShowFunctionsModal(false); setNewFunctionText(""); }}>
+              <Text style={styles.cancelModalText}>Cerrar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.saveModalBtn} onPress={handleAddFunction} disabled={createFunction.isPending}>
+              {createFunction.isPending ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.saveModalText}>Agregar</Text>}
+            </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      </KeyboardModal>
     </ScreenContainer>
   );
 }
@@ -380,6 +389,7 @@ const styles = StyleSheet.create({
   functionsBtnText: { fontSize: 12, fontWeight: "600", color: "#1B4F9B" },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
   modalContent: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24 },
+  modalPadding: { paddingHorizontal: 20, paddingTop: 16 },
   modalTitle: { fontSize: 18, fontWeight: "800", color: "#1A1A2E", marginBottom: 16 },
   inputLabel: { fontSize: 12, fontWeight: "600", color: "#6B7280", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 },
   input: { borderWidth: 1.5, borderColor: "#E5E7EB", borderRadius: 10, padding: 12, fontSize: 15, color: "#1A1A2E", marginBottom: 14 },

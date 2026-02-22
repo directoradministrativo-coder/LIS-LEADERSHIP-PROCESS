@@ -1,7 +1,8 @@
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, Alert, ActivityIndicator, Modal, FlatList, Platform
+  TextInput, Alert, ActivityIndicator, FlatList, Platform
 } from "react-native";
+import { KeyboardModal } from "@/components/keyboard-modal";
 import { ScreenContainer } from "@/components/screen-container";
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
@@ -282,144 +283,61 @@ export default function AdminUsuariosScreen() {
       )}
 
       {/* Add User Modal */}
-      <Modal visible={showAddModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Agregar Usuario</Text>
-              <TouchableOpacity onPress={() => { setShowAddModal(false); setFormErrors([]); setForm(EMPTY_FORM); }}>
-                <MaterialIcons name="close" size={24} color="#6B7280" />
-              </TouchableOpacity>
+      <KeyboardModal
+        visible={showAddModal}
+        onClose={() => { setShowAddModal(false); setFormErrors([]); setForm(EMPTY_FORM); }}
+        title="Agregar Usuario"
+      >
+        <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
+          {formErrors.length > 0 && (
+            <View style={styles.errorBox}>
+              <MaterialIcons name="error-outline" size={16} color="#CC2229" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.errorTitle}>Campos obligatorios incompletos:</Text>
+                {formErrors.map((e, i) => <Text key={i} style={styles.errorItem}>{e}</Text>)}
+              </View>
             </View>
-
-            {formErrors.length > 0 && (
-              <View style={styles.errorBox}>
-                <MaterialIcons name="error-outline" size={16} color="#CC2229" />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.errorTitle}>Campos obligatorios incompletos:</Text>
-                  {formErrors.map((e, i) => <Text key={i} style={styles.errorItem}>{e}</Text>)}
-                </View>
-              </View>
-            )}
-
-            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-              <Text style={styles.fieldLabel}>Email <Text style={styles.required}>*</Text></Text>
-              <TextInput
-                style={[styles.input, formErrors.some(e => e.includes("Email")) && styles.inputError]}
-                value={form.email}
-                onChangeText={v => setForm(p => ({ ...p, email: v }))}
-                placeholder="usuario@lis.com.co"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                placeholderTextColor="#9CA3AF"
-              />
-
-              <Text style={styles.fieldLabel}>Nombre completo <Text style={styles.required}>*</Text></Text>
-              <TextInput
-                style={[styles.input, formErrors.some(e => e.includes("Nombre")) && styles.inputError]}
-                value={form.name}
-                onChangeText={v => setForm(p => ({ ...p, name: v }))}
-                placeholder="Nombre del líder de área"
-                placeholderTextColor="#9CA3AF"
-              />
-
-              <Text style={styles.fieldLabel}>Área</Text>
-              <TextInput
-                style={styles.input}
-                value={form.areaName}
-                onChangeText={v => setForm(p => ({ ...p, areaName: v }))}
-                placeholder="Ej: Logística, Operaciones..."
-                placeholderTextColor="#9CA3AF"
-              />
-
-              <Text style={styles.fieldLabel}>Rol</Text>
-              <View style={styles.roleSelector}>
-                {(["user", "admin", "superadmin"] as Role[]).map(r => (
-                  <TouchableOpacity
-                    key={r}
-                    style={[styles.roleOption, form.role === r && { backgroundColor: ROLE_COLORS[r], borderColor: ROLE_COLORS[r] }]}
-                    onPress={() => setForm(p => ({ ...p, role: r }))}
-                  >
-                    <MaterialIcons
-                      name={r === "superadmin" ? "verified" : r === "admin" ? "admin-panel-settings" : "person"}
-                      size={16}
-                      color={form.role === r ? "#FFFFFF" : "#6B7280"}
-                    />
-                    <Text style={[styles.roleOptionText, form.role === r && styles.roleOptionTextActive]}>
-                      {r === "superadmin" ? "SuperAdmin" : r === "admin" ? "Admin" : "Usuario"}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
-
-            <TouchableOpacity
-              style={[styles.saveBtn, createUser.isPending && styles.saveBtnDisabled]}
-              onPress={handleSave}
-              disabled={createUser.isPending}
-            >
-              {createUser.isPending ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Text style={styles.saveBtnText}>Guardar Usuario</Text>
-              )}
-            </TouchableOpacity>
+          )}
+          <Text style={styles.fieldLabel}>Email <Text style={styles.required}>*</Text></Text>
+          <TextInput style={[styles.input, formErrors.some(e => e.includes("Email")) && styles.inputError]} value={form.email} onChangeText={v => setForm(p => ({ ...p, email: v }))} placeholder="usuario@lis.com.co" keyboardType="email-address" autoCapitalize="none" placeholderTextColor="#9CA3AF" />
+          <Text style={styles.fieldLabel}>Nombre completo <Text style={styles.required}>*</Text></Text>
+          <TextInput style={[styles.input, formErrors.some(e => e.includes("Nombre")) && styles.inputError]} value={form.name} onChangeText={v => setForm(p => ({ ...p, name: v }))} placeholder="Nombre del líder de área" placeholderTextColor="#9CA3AF" />
+          <Text style={styles.fieldLabel}>Área</Text>
+          <TextInput style={styles.input} value={form.areaName} onChangeText={v => setForm(p => ({ ...p, areaName: v }))} placeholder="Ej: Logística, Operaciones..." placeholderTextColor="#9CA3AF" />
+          <Text style={styles.fieldLabel}>Rol</Text>
+          <View style={styles.roleSelector}>
+            {(["user", "admin", "superadmin"] as Role[]).map(r => (
+              <TouchableOpacity key={r} style={[styles.roleOption, form.role === r && { backgroundColor: ROLE_COLORS[r], borderColor: ROLE_COLORS[r] }]} onPress={() => setForm(p => ({ ...p, role: r }))}>
+                <MaterialIcons name={r === "superadmin" ? "verified" : r === "admin" ? "admin-panel-settings" : "person"} size={16} color={form.role === r ? "#FFFFFF" : "#6B7280"} />
+                <Text style={[styles.roleOptionText, form.role === r && styles.roleOptionTextActive]}>{r === "superadmin" ? "SuperAdmin" : r === "admin" ? "Admin" : "Usuario"}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
+          <TouchableOpacity style={[styles.saveBtn, createUser.isPending && styles.saveBtnDisabled]} onPress={handleSave} disabled={createUser.isPending}>
+            {createUser.isPending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.saveBtnText}>Guardar Usuario</Text>}
+          </TouchableOpacity>
         </View>
-      </Modal>
+      </KeyboardModal>
 
       {/* Import CSV Modal */}
-      <Modal visible={showImportModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Importar desde CSV</Text>
-              <TouchableOpacity onPress={() => { setShowImportModal(false); setCsvText(""); }}>
-                <MaterialIcons name="close" size={24} color="#6B7280" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-              <View style={styles.csvFormatBox}>
-                <Text style={styles.csvFormatTitle}>📋 Formato del CSV:</Text>
-                <Text style={styles.csvFormatCode}>
-                  {"email,nombre,area,rol\njuan@lis.com.co,Juan Pérez,Logística,user\nadmin@lis.com.co,Ana García,Dirección,admin\nsuperadmin@lis.com.co,Carlos Dir,Gerencia,superadmin"}
-                </Text>
-              </View>
-
-              <Text style={styles.fieldLabel}>Pega el contenido del CSV aquí:</Text>
-              <TextInput
-                style={styles.csvInput}
-                value={csvText}
-                onChangeText={setCsvText}
-                placeholder={"email,nombre,area,rol\n..."}
-                multiline
-                numberOfLines={8}
-                placeholderTextColor="#9CA3AF"
-                textAlignVertical="top"
-              />
-
-              {csvText.length > 0 && (
-                <Text style={styles.csvPreview}>
-                  {parseCSV(csvText).length} filas detectadas
-                </Text>
-              )}
-            </ScrollView>
-
-            <TouchableOpacity
-              style={[styles.saveBtn, (importing || !csvText.trim()) && styles.saveBtnDisabled]}
-              onPress={handleImportCSV}
-              disabled={importing || !csvText.trim()}
-            >
-              {importing ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Text style={styles.saveBtnText}>Importar usuarios</Text>
-              )}
-            </TouchableOpacity>
+      <KeyboardModal
+        visible={showImportModal}
+        onClose={() => { setShowImportModal(false); setCsvText(""); }}
+        title="Importar desde CSV"
+      >
+        <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
+          <View style={styles.csvFormatBox}>
+            <Text style={styles.csvFormatTitle}>📋 Formato del CSV:</Text>
+            <Text style={styles.csvFormatCode}>{"email,nombre,area,rol\njuan@lis.com.co,Juan Pérez,Logística,user\nadmin@lis.com.co,Ana García,Dirección,admin"}</Text>
           </View>
+          <Text style={styles.fieldLabel}>Pega el contenido del CSV aquí:</Text>
+          <TextInput style={styles.csvInput} value={csvText} onChangeText={setCsvText} placeholder={"email,nombre,area,rol\n..."} multiline numberOfLines={8} placeholderTextColor="#9CA3AF" textAlignVertical="top" />
+          {csvText.length > 0 && <Text style={styles.csvPreview}>{parseCSV(csvText).length} filas detectadas</Text>}
+          <TouchableOpacity style={[styles.saveBtn, (importing || !csvText.trim()) && styles.saveBtnDisabled]} onPress={handleImportCSV} disabled={importing || !csvText.trim()}>
+            {importing ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.saveBtnText}>Importar usuarios</Text>}
+          </TouchableOpacity>
         </View>
-      </Modal>
+      </KeyboardModal>
     </ScreenContainer>
   );
 }
