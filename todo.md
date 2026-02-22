@@ -390,3 +390,7 @@
 - [x] Ajuste A: Agregar writeAuditLog en upsertDOFA para trazabilidad de cambios en la matriz DOFA
 - [x] Ajuste B: Incluir funciones de colaboradores en la hoja de organigrama del Excel exportado (ya implementado, validado)
 - [x] Ajuste C: Agregar opciones de filtro en historial para módulos nuevos (dofaMatrix, collaboratorFunctions, interactionStrengths)
+
+## Ajuste v24 — Dominio
+
+- [x] Cambiar link/dominio de la app web a www.lisleadership.com.co en todos los archivos relevantes

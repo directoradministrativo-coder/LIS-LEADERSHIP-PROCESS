@@ -1,4 +1,4 @@
-import { View, Text, Image, TouchableOpacity, ActivityIndicator, StyleSheet, ScrollView } from "react-native";
+import { View, Text, Image, TouchableOpacity, ActivityIndicator, StyleSheet, ScrollView, Linking } from "react-native";
 import { useAuth } from "@/hooks/use-auth";
 import { useColors } from "@/hooks/use-colors";
 import { router } from "expo-router";
@@ -96,6 +96,9 @@ export default function LoginScreen() {
             <View style={[styles.colorBlock, { backgroundColor: "#1B4F9B" }]} />
           </View>
           <Text style={styles.footerText}>© 2026 Logística Inteligente Solution</Text>
+          <TouchableOpacity onPress={() => Linking.openURL('https://www.lisleadership.com.co')}>
+            <Text style={styles.footerLink}>www.lisleadership.com.co</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </ScreenContainer>
@@ -238,6 +241,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#9CA3AF",
     textAlign: "center",
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  footerLink: {
+    fontSize: 11,
+    color: "#1B4F9B",
+    textAlign: "center",
+    paddingBottom: 12,
+    textDecorationLine: "underline",
   },
 });

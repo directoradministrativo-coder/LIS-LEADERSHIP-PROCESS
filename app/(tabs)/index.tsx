@@ -1,4 +1,4 @@
-import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, Alert } from "react-native";
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, Alert, Linking } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useAuth } from "@/hooks/use-auth";
 import { useColors } from "@/hooks/use-colors";
@@ -349,6 +349,9 @@ export default function HomeScreen() {
             <View style={[styles.colorBlock, { backgroundColor: "#1B4F9B" }]} />
           </View>
           <Text style={styles.footerText}>Logística Inteligente Solution © 2026</Text>
+          <TouchableOpacity onPress={() => Linking.openURL('https://www.lisleadership.com.co')}>
+            <Text style={styles.footerLink}>www.lisleadership.com.co</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </ScreenContainer>
@@ -721,5 +724,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: "#9CA3AF",
     textAlign: "center",
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  footerLink: {
+    fontSize: 11,
+    color: "#1B4F9B",
+    textAlign: "center",
+    paddingBottom: 10,
+    textDecorationLine: "underline",
   },
 });
