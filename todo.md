@@ -256,3 +256,13 @@
 - [x] Botón "Limpiar" individual por campo y botón "✕ Limpiar" para ambos filtros
 - [x] Indicador visual (color azul) cuando hay filtro de fecha activo
 - [x] Resetear visibleCount al aplicar o limpiar filtros de fecha
+
+## Feature v15 - Restauración Universal en Historial
+
+- [x] Extender restoreAuditRecord en db.ts: soporte para acción "update" (revertir oldData: kpis, projects, orgCollaborators, interactionTasks)
+- [x] Extender restoreAuditRecord en db.ts: soporte para acción "create" (eliminar el registro creado: kpis, projects, orgCollaborators, orgHierarchies, processInteractions)
+- [x] DetailModal en admin-historial.tsx: botón Restaurar visible para delete, update y create (no restaurados)
+- [x] Etiquetas diferenciadas: "Recrear registro" (delete), "Revertir cambio" (update), "Deshacer creación" (create)
+- [x] Descripción en amarillo antes del botón explicando qué hará la acción
+- [x] Confirmación diferenciada en Alert.alert según el tipo de acción
+- [x] Borde de tarjeta en color de acción para registros no restaurados (todos los tipos)

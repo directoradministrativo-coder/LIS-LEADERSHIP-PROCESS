@@ -151,7 +151,19 @@ function DetailModal({
   const colors = useColors();
   if (!entry) return null;
 
-  const canRestore = entry.action === "delete" && !entry.isRestored;
+  const canRestore = !entry.isRestored && ["delete", "update", "create"].includes(entry.action);
+
+  const restoreLabel = entry.action === "delete"
+    ? "\u21a9 Recrear registro"
+    : entry.action === "update"
+    ? "\u21a9 Revertir cambio"
+    : "\u21a9 Deshacer creaci\u00f3n";
+
+  const restoreDescription = entry.action === "delete"
+    ? "Se recrear\u00e1 el registro eliminado con los datos originales."
+    : entry.action === "update"
+    ? "Se revertir\u00e1n los campos al estado anterior al cambio."
+    : "Se eliminar\u00e1 el registro que fue creado (deshacer creaci\u00f3n).";
   const moduleLabel = MODULE_LABELS[entry.tableName] ?? entry.tableName;
   const actionInfo = ACTION_LABELS[entry.action] ?? { label: entry.action, color: "#687076" };
 
@@ -274,6 +286,13 @@ function DetailModal({
           </ScrollView>
 
           {/* Actions */}
+          {canRestore && (
+            <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 }}>
+              <Text style={{ color: "#F59E0B", fontSize: 12, textAlign: "center", lineHeight: 17 }}>
+                ⚠️ {restoreDescription}
+              </Text>
+            </View>
+          )}
           <View style={[styles.modalFooter, { borderTopColor: colors.border }]}>
             <TouchableOpacity
               style={[styles.cancelBtn, { borderColor: colors.border }]}
@@ -290,7 +309,7 @@ function DetailModal({
                 {restoring ? (
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
-                  <Text style={{ color: "#fff", fontWeight: "700" }}>↩ Restaurar</Text>
+                  <Text style={{ color: "#fff", fontWeight: "700" }}>{restoreLabel}</Text>
                 )}
               </TouchableOpacity>
             )}
@@ -349,16 +368,27 @@ export default function AdminHistorialScreen() {
 
   const handleRestore = useCallback(
     (id: number) => {
+      const entry = selectedEntry;
+      const actionMsg = entry?.action === "delete"
+        ? "Se recrear\u00e1 el registro eliminado con los datos originales."
+        : entry?.action === "update"
+        ? "Se revertir\u00e1n los campos al estado anterior al cambio."
+        : "Se eliminar\u00e1 el registro que fue creado (deshacer creaci\u00f3n).";
+      const btnLabel = entry?.action === "delete"
+        ? "Recrear"
+        : entry?.action === "update"
+        ? "Revertir"
+        : "Deshacer";
       Alert.alert(
-        "Confirmar restauración",
-        "¿Está seguro de que desea restaurar este registro? Se volverá a crear en el sistema.",
+        "Confirmar restauraci\u00f3n",
+        actionMsg,
         [
           { text: "Cancelar", style: "cancel" },
-          { text: "Restaurar", onPress: () => restoreMutation.mutate({ id }) },
+          { text: btnLabel, style: "destructive", onPress: () => restoreMutation.mutate({ id }) },
         ]
       );
     },
-    [restoreMutation]
+    [restoreMutation, selectedEntry]
   );
 
   const onRefresh = useCallback(async () => {
@@ -394,7 +424,7 @@ export default function AdminHistorialScreen() {
           styles.card,
           {
             backgroundColor: colors.surface,
-            borderColor: item.action === "delete" && !item.isRestored ? "#EF444430" : colors.border,
+            borderColor: !item.isRestored ? actionInfo.color + "30" : colors.border,
             borderLeftColor: actionInfo.color,
           },
         ]}

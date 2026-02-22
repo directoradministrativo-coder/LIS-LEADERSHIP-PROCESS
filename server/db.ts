@@ -1133,7 +1133,81 @@ export async function restoreAuditRecord(
   if (entry.length === 0) throw new Error("Audit record not found");
 
   const record = entry[0];
-  if (record.action !== "delete") throw new Error("Only deleted records can be restored");
+
+  // ── Handle UPDATE: revert to oldData ──────────────────────────────────────
+  if (record.action === "update") {
+    if (!record.oldData) throw new Error("No previous snapshot available for this update");
+    const oldData = JSON.parse(record.oldData);
+    const { id, ...fieldsToRestore } = oldData;
+    const recordId = record.recordId;
+
+    switch (record.tableName) {
+      case "kpis":
+        await db.update(kpis).set(fieldsToRestore).where(eq(kpis.id, recordId));
+        await writeAuditLog("kpis", recordId, "update", JSON.parse(record.newData ?? "{}"), fieldsToRestore,
+          `Admin revirtió KPI al estado anterior desde historial`, ctx);
+        break;
+      case "projects":
+        await db.update(projects).set({ ...fieldsToRestore, hasNotification: true, notificationMessage: "El administrador revirtió cambios en este proyecto" }).where(eq(projects.id, recordId));
+        await writeAuditLog("projects", recordId, "update", JSON.parse(record.newData ?? "{}"), fieldsToRestore,
+          `Admin revirtió proyecto al estado anterior desde historial`, ctx);
+        break;
+      case "orgCollaborators":
+        await db.update(orgCollaborators).set(fieldsToRestore).where(eq(orgCollaborators.id, recordId));
+        await writeAuditLog("orgCollaborators", recordId, "update", JSON.parse(record.newData ?? "{}"), fieldsToRestore,
+          `Admin revirtió colaborador al estado anterior desde historial`, ctx);
+        break;
+      case "kpiValues":
+      case "interactionTasks":
+        await db.update(interactionTasks).set(fieldsToRestore).where(eq(interactionTasks.id, recordId));
+        await writeAuditLog("interactionTasks", recordId, "update", JSON.parse(record.newData ?? "{}"), fieldsToRestore,
+          `Admin revirtió tarea al estado anterior desde historial`, ctx);
+        break;
+      default:
+        throw new Error(`Revert not supported for table: ${record.tableName}`);
+    }
+    await markAuditRestored(auditId);
+    return { success: true, tableName: record.tableName, recordId, action: "update" };
+  }
+
+  // ── Handle CREATE: delete the created record ──────────────────────────────
+  if (record.action === "create") {
+    const recordId = record.recordId;
+    switch (record.tableName) {
+      case "kpis":
+        await db.delete(kpis).where(eq(kpis.id, recordId));
+        await writeAuditLog("kpis", recordId, "delete", JSON.parse(record.newData ?? "{}"), null,
+          `Admin eliminó KPI creado (restauración desde historial)`, ctx);
+        break;
+      case "projects":
+        await db.delete(projects).where(eq(projects.id, recordId));
+        await writeAuditLog("projects", recordId, "delete", JSON.parse(record.newData ?? "{}"), null,
+          `Admin eliminó proyecto creado (restauración desde historial)`, ctx);
+        break;
+      case "orgCollaborators":
+        await db.delete(orgCollaborators).where(eq(orgCollaborators.id, recordId));
+        await writeAuditLog("orgCollaborators", recordId, "delete", JSON.parse(record.newData ?? "{}"), null,
+          `Admin eliminó colaborador creado (restauración desde historial)`, ctx);
+        break;
+      case "orgHierarchies":
+        await db.delete(orgHierarchies).where(eq(orgHierarchies.id, recordId));
+        await writeAuditLog("orgHierarchies", recordId, "delete", JSON.parse(record.newData ?? "{}"), null,
+          `Admin eliminó cargo/nivel creado (restauración desde historial)`, ctx);
+        break;
+      case "processInteractions":
+        await db.delete(processInteractions).where(eq(processInteractions.id, recordId));
+        await writeAuditLog("processInteractions", recordId, "delete", JSON.parse(record.newData ?? "{}"), null,
+          `Admin eliminó interacción creada (restauración desde historial)`, ctx);
+        break;
+      default:
+        throw new Error(`Undo-create not supported for table: ${record.tableName}`);
+    }
+    await markAuditRestored(auditId);
+    return { success: true, tableName: record.tableName, recordId, action: "create" };
+  }
+
+  // ── Handle DELETE: recreate the record ────────────────────────────────────
+  if (record.action !== "delete") throw new Error("Unsupported action for restoration");
   if (!record.oldData) throw new Error("No snapshot data available for restoration");
 
   const oldData = JSON.parse(record.oldData);
