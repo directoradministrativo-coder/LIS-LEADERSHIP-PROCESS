@@ -304,3 +304,6 @@
 - [x] admin-historial.tsx: useLisRole() ✓
 - [x] admin-usuarios.tsx: protegido por tab layout (href: isAdmin ? undefined : null) ✓
 - [x] TypeScript: 0 errores ✓
+- [x] Fix timing: no renderizar <Tabs> hasta que lisRole !== null (evita que href:null se evalúe con rol null)
+- [x] key={`tabs-${lisRole}`} en <Tabs> para forzar remontaje si el rol cambia
+- [x] Tests unitarios de permisos: 9/9 passing en tests/permissions.test.ts

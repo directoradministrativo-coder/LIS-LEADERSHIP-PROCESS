@@ -153,10 +153,21 @@ export default function TabLayout() {
     );
   }
 
+  // CRITICAL: Don't render Tabs until lisRole is resolved.
+  // Expo Router evaluates `href` only on initial mount.
+  // If we render before lisRole is known, all tabs mount as visible (isAdmin=false).
+  const renderTabs = lisRole !== null;
+
   return (
     <LisRoleContext.Provider value={lisRole}>
       <AuthorizationGate onRoleResolved={setLisRole}>
-        <Tabs
+        {!renderTabs ? (
+          <View style={{ flex: 1, backgroundColor: "#FFFFFF", justifyContent: "center", alignItems: "center" }}>
+            <ActivityIndicator size="large" color="#CC2229" />
+          </View>
+        ) : (
+          <Tabs
+          key={`tabs-${lisRole}`}
           screenOptions={{
             tabBarActiveTintColor: "#CC2229",
             tabBarInactiveTintColor: "#9CA3AF",
@@ -264,7 +275,8 @@ export default function TabLayout() {
               href: isAdmin ? undefined : null,
             }}
           />
-        </Tabs>
+          </Tabs>
+        )}
       </AuthorizationGate>
     </LisRoleContext.Provider>
   );
