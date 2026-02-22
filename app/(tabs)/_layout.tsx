@@ -1,25 +1,127 @@
 import { Tabs, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Platform, View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
+import {
+  Platform,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  Pressable,
+} from "react-native";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState, createContext, useContext } from "react";
 import { MaterialIcons } from "@expo/vector-icons";
 import { trpc } from "@/lib/trpc";
 import { Storage } from "@/lib/storage";
+import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 
 const PROFILE_KEY = "lis_active_profile";
 const ROLE_KEY = "lis_user_role";
 
 // ─── LIS Role Context ─────────────────────────────────────────────────────────
-// Shares the verified LIS role (from DB) across the entire tab tree
-
 type LisRole = "user" | "admin" | "superadmin" | null;
 
 const LisRoleContext = createContext<LisRole>(null);
 export function useLisRole() { return useContext(LisRoleContext); }
 
-// ─── Authorization Gate ───────────────────────────────────────────────────────
+// ─── Tab definitions ──────────────────────────────────────────────────────────
+// adminOnly: true → hidden for "user" role
+const TAB_DEFS: {
+  name: string;
+  title: string;
+  icon: string;
+  adminOnly?: boolean;
+}[] = [
+  { name: "index",            title: "Inicio",       icon: "home" },
+  { name: "organigrama",      title: "Organigrama",  icon: "account-tree" },
+  { name: "organigrama-visual", title: "Vista Org.", icon: "hub" },
+  { name: "kpis",             title: "KPIs",         icon: "bar-chart" },
+  { name: "dofa",             title: "DOFA",         icon: "search" },
+  { name: "interacciones",    title: "Interacciones",icon: "swap-horiz" },
+  { name: "proyectos",        title: "Proyectos",    icon: "rocket-launch" },
+  { name: "admin-progreso",   title: "Progreso",     icon: "leaderboard" },
+  { name: "exportar",         title: "Exportar",     icon: "download",          adminOnly: true },
+  { name: "admin-usuarios",   title: "Usuarios",     icon: "manage-accounts",   adminOnly: true },
+  { name: "admin-proyectos",  title: "Proy. Admin",  icon: "assignment",        adminOnly: true },
+  { name: "admin-historial",  title: "Historial",    icon: "history",           adminOnly: true },
+];
 
+// ─── Custom Tab Bar ───────────────────────────────────────────────────────────
+// Renders only the tabs that the current role is allowed to see.
+// This is fully reactive: whenever lisRole changes, the bar re-renders.
+function CustomTabBar({
+  state,
+  navigation,
+  lisRole,
+  bottomPadding,
+  tabBarHeight,
+}: BottomTabBarProps & { lisRole: LisRole; bottomPadding: number; tabBarHeight: number }) {
+  const isAdmin = lisRole === "admin" || lisRole === "superadmin";
+
+  // Build a map of route name → index in state.routes
+  const routeMap = Object.fromEntries(state.routes.map((r, i) => [r.name, i]));
+
+  const visibleTabs = TAB_DEFS.filter((t) => {
+    if (t.adminOnly && !isAdmin) return false;
+    return routeMap[t.name] !== undefined;
+  });
+
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        backgroundColor: "#FFFFFF",
+        borderTopWidth: 0.5,
+        borderTopColor: "#E5E7EB",
+        paddingTop: 6,
+        paddingBottom: bottomPadding,
+        height: tabBarHeight,
+      }}
+    >
+      {visibleTabs.map((tab) => {
+        const routeIndex = routeMap[tab.name];
+        const isFocused = state.index === routeIndex;
+        const color = isFocused ? "#CC2229" : "#9CA3AF";
+
+        const onPress = () => {
+          const event = navigation.emit({
+            type: "tabPress",
+            target: state.routes[routeIndex].key,
+            canPreventDefault: true,
+          });
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(tab.name);
+          }
+        };
+
+        return (
+          <Pressable
+            key={tab.name}
+            onPress={onPress}
+            style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+          >
+            <MaterialIcons name={tab.icon as any} size={22} color={color} />
+            <Text
+              style={{
+                fontSize: 9,
+                fontWeight: "600",
+                color,
+                marginTop: 2,
+                textAlign: "center",
+              }}
+              numberOfLines={1}
+            >
+              {tab.title}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+// ─── Authorization Gate ───────────────────────────────────────────────────────
 function AuthorizationGate({
   children,
   onRoleResolved,
@@ -51,9 +153,7 @@ function AuthorizationGate({
     if (checkAuth.isSuccess) {
       if (checkAuth.data?.authorized) {
         const lisRole = (checkAuth.data.role ?? "user") as LisRole;
-        // Persist role for logout cleanup
         Storage.setItem(ROLE_KEY, lisRole ?? "user");
-        // Notify TabLayout of the resolved role immediately
         onRoleResolved(lisRole);
 
         if (lisRole === "superadmin") {
@@ -118,25 +218,20 @@ function AuthorizationGate({
 }
 
 // ─── Tab Layout ───────────────────────────────────────────────────────────────
-
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { isAuthenticated, loading } = useAuth();
   const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 8);
   const tabBarHeight = 56 + bottomPadding;
 
-  // lisRole is set synchronously when AuthorizationGate resolves the role
   const [lisRole, setLisRole] = useState<LisRole>(null);
-  const isAdmin = lisRole === "admin" || lisRole === "superadmin";
 
-  // Redirect to login as soon as we know user is not authenticated
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       router.replace("/login" as any);
     }
   }, [loading, isAuthenticated]);
 
-  // Show loading spinner while checking auth state
   if (loading || (!isAuthenticated && !loading)) {
     return (
       <View style={{ flex: 1, backgroundColor: "#FFFFFF", justifyContent: "center", alignItems: "center" }}>
@@ -153,130 +248,50 @@ export default function TabLayout() {
     );
   }
 
-  // CRITICAL: Don't render Tabs until lisRole is resolved.
-  // Expo Router evaluates `href` only on initial mount.
-  // If we render before lisRole is known, all tabs mount as visible (isAdmin=false).
-  const renderTabs = lisRole !== null;
+  // Don't render Tabs until role is resolved so the custom tab bar
+  // has the correct role from the very first render.
+  if (lisRole === null) {
+    return (
+      <LisRoleContext.Provider value={lisRole}>
+        <AuthorizationGate onRoleResolved={setLisRole}>
+          <View style={{ flex: 1, backgroundColor: "#FFFFFF", justifyContent: "center", alignItems: "center" }}>
+            <ActivityIndicator size="large" color="#CC2229" />
+            <Text style={{ marginTop: 12, fontSize: 14, color: "#6B7280" }}>Cargando perfil...</Text>
+          </View>
+        </AuthorizationGate>
+      </LisRoleContext.Provider>
+    );
+  }
 
   return (
     <LisRoleContext.Provider value={lisRole}>
       <AuthorizationGate onRoleResolved={setLisRole}>
-        {!renderTabs ? (
-          <View style={{ flex: 1, backgroundColor: "#FFFFFF", justifyContent: "center", alignItems: "center" }}>
-            <ActivityIndicator size="large" color="#CC2229" />
-          </View>
-        ) : (
-          <Tabs
-          key={`tabs-${lisRole}`}
+        <Tabs
+          tabBar={(props) => (
+            <CustomTabBar
+              {...props}
+              lisRole={lisRole}
+              bottomPadding={bottomPadding}
+              tabBarHeight={tabBarHeight}
+            />
+          )}
           screenOptions={{
-            tabBarActiveTintColor: "#CC2229",
-            tabBarInactiveTintColor: "#9CA3AF",
             headerShown: false,
-            tabBarStyle: {
-              paddingTop: 6,
-              paddingBottom: bottomPadding,
-              height: tabBarHeight,
-              backgroundColor: "#FFFFFF",
-              borderTopColor: "#E5E7EB",
-              borderTopWidth: 0.5,
-            },
-            tabBarLabelStyle: {
-              fontSize: 10,
-              fontWeight: "600",
-            },
           }}
         >
-          <Tabs.Screen
-            name="index"
-            options={{
-              title: "Inicio",
-              tabBarIcon: ({ color, size }) => <MaterialIcons name="home" size={size} color={color} />,
-            }}
-          />
-          <Tabs.Screen
-            name="organigrama"
-            options={{
-              title: "Organigrama",
-              tabBarIcon: ({ color, size }) => <MaterialIcons name="account-tree" size={size} color={color} />,
-            }}
-          />
-          <Tabs.Screen
-            name="organigrama-visual"
-            options={{
-              title: "Vista Org.",
-              tabBarIcon: ({ color, size }) => <MaterialIcons name="hub" size={size} color={color} />,
-            }}
-          />
-          <Tabs.Screen
-            name="kpis"
-            options={{
-              title: "KPIs",
-              tabBarIcon: ({ color, size }) => <MaterialIcons name="bar-chart" size={size} color={color} />,
-            }}
-          />
-          <Tabs.Screen
-            name="dofa"
-            options={{
-              title: "DOFA",
-              tabBarIcon: ({ color, size }) => <MaterialIcons name="search" size={size} color={color} />,
-            }}
-          />
-          <Tabs.Screen
-            name="interacciones"
-            options={{
-              title: "Interacciones",
-              tabBarIcon: ({ color, size }) => <MaterialIcons name="swap-horiz" size={size} color={color} />,
-            }}
-          />
-          <Tabs.Screen
-            name="exportar"
-            options={{
-              title: "Exportar",
-              tabBarIcon: ({ color, size }) => <MaterialIcons name="download" size={size} color={color} />,
-              href: isAdmin ? undefined : null,
-            }}
-          />
-          <Tabs.Screen
-            name="proyectos"
-            options={{
-              title: "Proyectos",
-              tabBarIcon: ({ color, size }) => <MaterialIcons name="rocket-launch" size={size} color={color} />,
-            }}
-          />
-          {/* Admin-only tabs: visible only for admin and superadmin roles */}
-          <Tabs.Screen
-            name="admin-usuarios"
-            options={{
-              title: "Usuarios",
-              tabBarIcon: ({ color, size }) => <MaterialIcons name="manage-accounts" size={size} color={color} />,
-              href: isAdmin ? undefined : null,
-            }}
-          />
-          <Tabs.Screen
-            name="admin-proyectos"
-            options={{
-              title: "Proy. Admin",
-              tabBarIcon: ({ color, size }) => <MaterialIcons name="assignment" size={size} color={color} />,
-              href: isAdmin ? undefined : null,
-            }}
-          />
-          <Tabs.Screen
-            name="admin-progreso"
-            options={{
-              title: "Progreso",
-              tabBarIcon: ({ color, size }) => <MaterialIcons name="leaderboard" size={size} color={color} />,
-            }}
-          />
-          <Tabs.Screen
-            name="admin-historial"
-            options={{
-              title: "Historial",
-              tabBarIcon: ({ color, size }) => <MaterialIcons name="history" size={size} color={color} />,
-              href: isAdmin ? undefined : null,
-            }}
-          />
-          </Tabs>
-        )}
+          {TAB_DEFS.map((tab) => (
+            <Tabs.Screen
+              key={tab.name}
+              name={tab.name}
+              options={{
+                title: tab.title,
+                tabBarIcon: ({ color, size }) => (
+                  <MaterialIcons name={tab.icon as any} size={size} color={color} />
+                ),
+              }}
+            />
+          ))}
+        </Tabs>
       </AuthorizationGate>
     </LisRoleContext.Provider>
   );

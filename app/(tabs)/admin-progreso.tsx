@@ -151,7 +151,10 @@ export default function AdminProgresoScreen() {
   const [showDeadlineModal, setShowDeadlineModal] = useState(false);
   const [deadlineInput, setDeadlineInput] = useState("");
 
-  const { data: progressList = [], isLoading, refetch } = trpc.admin.getConsolidatedProgress.useQuery({ enabled: isAdmin } as any);
+  const { data: progressList = [], isLoading, refetch } = trpc.admin.getConsolidatedProgress.useQuery(
+    undefined,
+    { enabled: isAdmin }
+  );
   const { data: deadlineData, refetch: refetchDeadline } = trpc.config.getDeadline.useQuery();
 
   const setDeadlineMutation = trpc.config.setDeadline.useMutation({
@@ -204,6 +207,17 @@ export default function AdminProgresoScreen() {
             totalUsers
         )
       : 0;
+
+  // While role is still loading, show spinner to avoid flicker
+  if (lisRole === null) {
+    return (
+      <ScreenContainer>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator size="large" color={LIS_BLUE} />
+        </View>
+      </ScreenContainer>
+    );
+  }
 
   if (!isAdmin) {
     return (

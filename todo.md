@@ -307,3 +307,11 @@
 - [x] Fix timing: no renderizar <Tabs> hasta que lisRole !== null (evita que href:null se evalúe con rol null)
 - [x] key={`tabs-${lisRole}`} en <Tabs> para forzar remontaje si el rol cambia
 - [x] Tests unitarios de permisos: 9/9 passing en tests/permissions.test.ts
+
+## Bug fixes v17 - Tabs y Progreso (sesión 3)
+- [x] Reemplazar href:null con CustomTabBar reactivo que filtra tabs según lisRole en tiempo real
+- [x] Tabs Exportar, Usuarios, Admin Proyectos, Historial: ocultos para perfil user via CustomTabBar
+- [x] admin-progreso.tsx: corregir enabled en getConsolidatedProgress (era { enabled: isAdmin } como input, ahora es opción de query)
+- [x] admin-progreso.tsx: agregar guard lisRole === null para evitar flicker de vista consolidada antes de resolver rol
+- [x] TypeScript: 0 errores
+- [x] Tests: 18/18 passing
