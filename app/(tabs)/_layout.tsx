@@ -1,4 +1,4 @@
-import { Tabs, router } from "expo-router";
+import { Tabs, router, usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Platform,
@@ -356,16 +356,13 @@ export default function TabLayout() {
     }
   }, [loading, isAuthenticated]);
 
-  // Subscribe to ProfileStore: when SuperAdmin selects a profile in select-profile.tsx,
-  // update the effectiveRole immediately WITHOUT re-mounting the layout.
-  // This is the definitive fix for the frozen effectiveRole bug.
+  // When SuperAdmin returns from select-profile, reset roles to null so the
+  // RoleResolver re-runs and reads the fresh PROFILE_KEY from Storage.
+  // This is the most reliable approach: no race conditions, no event ordering issues.
   useEffect(() => {
-    const unsubscribe = ProfileStore.subscribe((profile) => {
-      setRoles(prev => {
-        if (prev === null || prev.dbRole !== "superadmin") return prev;
-        const effectiveRole: LisRole = profile === "user" ? "user" : "superadmin";
-        return { effectiveRole, dbRole: prev.dbRole };
-      });
+    const unsubscribe = ProfileStore.subscribe(() => {
+      // Reset roles → triggers RoleResolver → reads fresh PROFILE_KEY → calls onResolved
+      setRoles(null);
     });
     return unsubscribe;
   }, []);

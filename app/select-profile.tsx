@@ -15,9 +15,13 @@ export default function SelectProfileScreen() {
 
   const selectProfile = async (profile: "user" | "admin") => {
     await Storage.setItem(PROFILE_KEY, profile);
-    // Notify the TabLayout context immediately via the store
-    // so effectiveRole updates without a full re-mount
+    // Notify the TabLayout context via the store BEFORE navigating.
+    // The TabLayout listener updates effectiveRole synchronously.
+    // Then we navigate back — the modal closes and the already-mounted
+    // TabLayout already has the correct effectiveRole.
     ProfileStore.set(profile);
+    // Small delay to ensure the store listener fires before navigation
+    await new Promise(resolve => setTimeout(resolve, 50));
     router.replace("/(tabs)" as any);
   };
 
