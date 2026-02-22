@@ -4,7 +4,7 @@ import {
 import { ScreenContainer } from "@/components/screen-container";
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
-import { buildExcelWorkbook, downloadExcel } from "@/lib/excel-export";
+import { buildExcelWorkbook, buildConsolidatedExcelWorkbook, downloadExcel } from "@/lib/excel-export";
 import { useLisRole } from "./_layout";
 import { MaterialIcons } from "@expo/vector-icons";
 
@@ -123,28 +123,22 @@ export default function ExportarScreen() {
     }
     setIsExporting(true);
     try {
-      // Build a combined workbook with all selected processes
-      const XLSX = require("xlsx");
-      const wb = XLSX.utils.book_new();
+      // Filter selected processes from allProcessesQuery raw data
+      const selectedData = (allProcessesQuery.data ?? [])
+        .filter((item: any) => targetIds.includes(item.process?.id ?? item.id));
 
-      // Cover sheet
-      const coverData = [
-        ["LOGÍSTICA INTELIGENTE SOLUTION"],
-        ["Levantamiento Consolidado de Procesos"],
-        [`Fecha de Exportación: ${new Date().toLocaleDateString("es-CO")}`],
-        [`Procesos incluidos: ${targetIds.length}`],
-        [],
-        ["Proceso", "Área", "Responsable", "Fecha Actualización"],
-        ...allProcesses
-          .filter((p: any) => targetIds.includes(p.id))
-          .map((p: any) => [p.processName, p.areaName ?? "", p.responsibleName ?? "", p.updatedAt ? new Date(p.updatedAt).toLocaleDateString("es-CO") : ""])
-      ];
-      const coverWS = XLSX.utils.aoa_to_sheet(coverData);
-      XLSX.utils.book_append_sheet(wb, coverWS, "Portada");
+      if (selectedData.length === 0) {
+        Alert.alert("Sin datos", "No se encontraron datos para los procesos seleccionados.");
+        return;
+      }
+
+      // Build consolidated workbook with same structure as individual export
+      const auditData = auditLogQuery.data ?? [];
+      const wb = buildConsolidatedExcelWorkbook(selectedData, auditData.length > 0 ? auditData : undefined);
 
       const filename = `LIS_Consolidado_${exportMode === "consolidated" ? "Todos" : "Seleccion"}_${new Date().toISOString().split("T")[0]}.xlsx`;
       await downloadExcel(wb, filename);
-      Alert.alert("Éxito", `Archivo consolidado generado con ${targetIds.length} proceso(s).`);
+      Alert.alert("Éxito", `Archivo consolidado generado con ${selectedData.length} proceso(s) y 7 hojas de datos.`);
     } catch (error) {
       Alert.alert("Error", "No se pudo generar el archivo Excel consolidado.");
       console.error(error);
@@ -321,7 +315,7 @@ export default function ExportarScreen() {
         <Text style={styles.exportNote}>
           {exportMode === "individual"
             ? "El archivo incluye todas las hojas con el levantamiento completo del proceso, listo para compartir o archivar."
-            : "El archivo consolidado incluye todos los procesos seleccionados en hojas separadas."}
+            : "El archivo consolidado incluye las mismas 7 hojas (Portada, Organigrama, KPIs, DOFA, Proveedores, Clientes, Proyectos) con los datos de todos los procesos seleccionados."}
         </Text>
 
         {/* ── ADMIN: EXPORT AUDIT LOG ── */}

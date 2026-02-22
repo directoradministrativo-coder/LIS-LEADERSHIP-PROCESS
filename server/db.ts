@@ -802,7 +802,16 @@ export async function getAllProcessesData() {
     }
     const kpiList = await db.select().from(kpis).where(eq(kpis.processId, process.id));
     const dofaRow = await db.select().from(dofaMatrix).where(eq(dofaMatrix.processId, process.id)).limit(1);
-    const interactions = await db.select().from(processInteractions).where(eq(processInteractions.processId, process.id));
+    const interactionRows = await db.select().from(processInteractions).where(eq(processInteractions.processId, process.id));
+    // Load tasks and strengths for each interaction
+    const interactionsWithDetails = [];
+    for (const interaction of interactionRows) {
+      const iTasks = await db.select().from(interactionTasks).where(eq(interactionTasks.interactionId, interaction.id));
+      const iStrengths = await db.select().from(interactionStrengths).where(eq(interactionStrengths.interactionId, interaction.id));
+      interactionsWithDetails.push({ ...interaction, tasks: iTasks, strengths: iStrengths });
+    }
+    // Load projects
+    const projectList = await db.select().from(projects).where(eq(projects.processId, process.id));
     result.push({
       process,
       user: user[0] ?? null,
@@ -817,7 +826,8 @@ export async function getAllProcessesData() {
         fortalezas: JSON.parse(dofaRow[0].fortalezas || "[]") as string[],
         amenazas: JSON.parse(dofaRow[0].amenazas || "[]") as string[],
       } : null,
-      interactions,
+      interactions: interactionsWithDetails,
+      projects: projectList,
     });
   }
 

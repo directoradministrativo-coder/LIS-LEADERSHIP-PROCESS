@@ -394,3 +394,11 @@
 ## Ajuste v24 — Dominio
 
 - [x] Cambiar link/dominio de la app web a www.lisleadership.com.co en todos los archivos relevantes
+
+## Ajuste v25 — Excel consolidado
+
+- [x] Excel consolidado (Todos/Seleccionar) debe tener las mismas hojas que el individual (Organigrama, KPIs, DOFA, Interacciones, Proyectos) pero consolidando datos de todos los procesos seleccionados
+- [x] getAllProcessesData ahora incluye projects, tasks y strengths por cada interacción
+- [x] Nueva función buildConsolidatedExcelWorkbook genera 7 hojas: Portada, Organigrama, KPIs, DOFA, Proveedores, Clientes, Proyectos + Historial opcional
+- [x] Cada hoja incluye columna "Proceso" para identificar el origen de cada fila
+- [x] handleExportAdmin reescrito para usar buildConsolidatedExcelWorkbook en vez de solo portada
