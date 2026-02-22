@@ -10,6 +10,7 @@ import {
   FlatList,
   RefreshControl,
   StyleSheet,
+  TextInput,
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { trpc } from "@/lib/trpc";
@@ -117,6 +118,19 @@ function formatDate(date: string | Date): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function formatDateShort(isoDate: string): string {
+  if (!isoDate) return "";
+  const d = new Date(isoDate);
+  return d.toLocaleDateString("es-CO", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+// Validate YYYY-MM-DD format
+function isValidDate(str: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) return false;
+  const d = new Date(str);
+  return !isNaN(d.getTime());
 }
 
 // ─── Detail Modal ─────────────────────────────────────────────────────────────
@@ -304,11 +318,18 @@ export default function AdminHistorialScreen() {
   const [detailVisible, setDetailVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [dateFrom, setDateFrom] = useState<string | null>(null);
+  const [dateTo, setDateTo] = useState<string | null>(null);
+  const [datePickerMode, setDatePickerMode] = useState<"from" | "to" | null>(null);
+  const [tempDateInput, setTempDateInput] = useState("");
+  const [dateInputError, setDateInputError] = useState("");
 
   const queryInput = {
     tableName: moduleFilter !== "all" ? moduleFilter : undefined,
     action: actionFilter !== "all" ? (actionFilter as "create" | "update" | "delete") : undefined,
     processName: areaFilter !== "all" ? areaFilter : undefined,
+    dateFrom: dateFrom ?? undefined,
+    dateTo: dateTo ?? undefined,
     limit: 500,
   };
 
@@ -497,6 +518,35 @@ export default function AdminHistorialScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Date range filter row */}
+      <View style={[styles.dateFilterRow, { borderBottomColor: colors.border, backgroundColor: colors.surface }]}>
+        <TouchableOpacity
+          style={[styles.datePill, { borderColor: dateFrom ? "#1B4F9B" : colors.border, backgroundColor: dateFrom ? "#1B4F9B15" : "transparent" }]}
+          onPress={() => { setTempDateInput(dateFrom ?? ""); setDateInputError(""); setDatePickerMode("from"); }}
+        >
+          <Text style={{ fontSize: 11, fontWeight: "600", color: dateFrom ? "#1B4F9B" : colors.muted }}>
+            {dateFrom ? `Desde: ${formatDateShort(dateFrom)}` : "Desde ▾"}
+          </Text>
+        </TouchableOpacity>
+        <Text style={{ color: colors.muted, fontSize: 12, marginHorizontal: 4 }}>—</Text>
+        <TouchableOpacity
+          style={[styles.datePill, { borderColor: dateTo ? "#1B4F9B" : colors.border, backgroundColor: dateTo ? "#1B4F9B15" : "transparent" }]}
+          onPress={() => { setTempDateInput(dateTo ?? ""); setDateInputError(""); setDatePickerMode("to"); }}
+        >
+          <Text style={{ fontSize: 11, fontWeight: "600", color: dateTo ? "#1B4F9B" : colors.muted }}>
+            {dateTo ? `Hasta: ${formatDateShort(dateTo)}` : "Hasta ▾"}
+          </Text>
+        </TouchableOpacity>
+        {(dateFrom || dateTo) && (
+          <TouchableOpacity
+            style={[styles.datePill, { borderColor: "#EF4444", backgroundColor: "#FEF2F2", marginLeft: 4 }]}
+            onPress={() => { setDateFrom(null); setDateTo(null); setVisibleCount(PAGE_SIZE); }}
+          >
+            <Text style={{ fontSize: 11, fontWeight: "700", color: "#EF4444" }}>✕ Limpiar</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
       {/* List */}
       {isLoading ? (
         <View style={styles.center}>
@@ -581,6 +631,114 @@ export default function AdminHistorialScreen() {
         onRestore={handleRestore}
         restoring={restoreMutation.isPending}
       />
+
+      {/* Date input modal */}
+      <Modal
+        visible={datePickerMode !== null}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setDatePickerMode(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.pickerContainer, { backgroundColor: colors.surface, padding: 20 }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.modalTitle, { color: colors.foreground }]}>
+                {datePickerMode === "from" ? "Fecha Desde" : "Fecha Hasta"}
+              </Text>
+              <TouchableOpacity onPress={() => setDatePickerMode(null)}>
+                <Text style={{ color: colors.muted, fontSize: 20 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ padding: 20, gap: 12 }}>
+              <Text style={{ color: colors.muted, fontSize: 13 }}>
+                Ingrese la fecha en formato AAAA-MM-DD
+              </Text>
+              <View
+                style={{
+                  borderWidth: 1.5,
+                  borderColor: dateInputError ? "#EF4444" : colors.border,
+                  borderRadius: 10,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  backgroundColor: colors.background,
+                }}
+              >
+                <TextInput
+                  value={tempDateInput}
+                  onChangeText={(t: string) => { setTempDateInput(t); setDateInputError(""); }}
+                  placeholder="2026-01-15"
+                  placeholderTextColor={colors.muted}
+                  keyboardType="numeric"
+                  maxLength={10}
+                  style={{ color: colors.foreground, fontSize: 16, letterSpacing: 1 }}
+                  returnKeyType="done"
+                  onSubmitEditing={() => {
+                    if (!tempDateInput) {
+                      if (datePickerMode === "from") setDateFrom(null);
+                      else setDateTo(null);
+                      setVisibleCount(PAGE_SIZE);
+                      setDatePickerMode(null);
+                      return;
+                    }
+                    if (!isValidDate(tempDateInput)) {
+                      setDateInputError("Formato inválido. Use AAAA-MM-DD");
+                      return;
+                    }
+                    if (datePickerMode === "from") setDateFrom(tempDateInput);
+                    else setDateTo(tempDateInput);
+                    setVisibleCount(PAGE_SIZE);
+                    setDatePickerMode(null);
+                  }}
+                />
+              </View>
+              {dateInputError ? (
+                <Text style={{ color: "#EF4444", fontSize: 12 }}>{dateInputError}</Text>
+              ) : null}
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
+                <TouchableOpacity
+                  style={[styles.cancelBtn, { borderColor: colors.border, flex: 1 }]}
+                  onPress={() => setDatePickerMode(null)}
+                >
+                  <Text style={{ color: colors.muted, fontWeight: "600" }}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.cancelBtn, { borderColor: "#EF4444", flex: 1 }]}
+                  onPress={() => {
+                    if (datePickerMode === "from") setDateFrom(null);
+                    else setDateTo(null);
+                    setVisibleCount(PAGE_SIZE);
+                    setDatePickerMode(null);
+                  }}
+                >
+                  <Text style={{ color: "#EF4444", fontWeight: "600" }}>Limpiar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ flex: 1, backgroundColor: "#1B4F9B", borderRadius: 12, paddingVertical: 14, alignItems: "center" }}
+                  onPress={() => {
+                    if (!tempDateInput) {
+                      if (datePickerMode === "from") setDateFrom(null);
+                      else setDateTo(null);
+                      setVisibleCount(PAGE_SIZE);
+                      setDatePickerMode(null);
+                      return;
+                    }
+                    if (!isValidDate(tempDateInput)) {
+                      setDateInputError("Formato inválido. Use AAAA-MM-DD");
+                      return;
+                    }
+                    if (datePickerMode === "from") setDateFrom(tempDateInput);
+                    else setDateTo(tempDateInput);
+                    setVisibleCount(PAGE_SIZE);
+                    setDatePickerMode(null);
+                  }}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "700" }}>Aplicar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -808,5 +966,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 12,
     marginBottom: 8,
+  },
+  dateFilterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 0.5,
+    gap: 6,
+  },
+  datePill: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
   },
 });

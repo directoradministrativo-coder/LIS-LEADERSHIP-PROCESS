@@ -158,6 +158,8 @@ export async function getAuditLogs(filters: {
   action?: "create" | "update" | "delete";
   processId?: number;
   processName?: string;
+  dateFrom?: string;
+  dateTo?: string;
   limit?: number;
   offset?: number;
 }) {
@@ -169,6 +171,13 @@ export async function getAuditLogs(filters: {
   if (filters.action) conditions.push(eq(auditLog.action, filters.action));
   if (filters.processId) conditions.push(eq(auditLog.processId, filters.processId));
   if (filters.processName) conditions.push(eq(auditLog.processName, filters.processName));
+  if (filters.dateFrom) conditions.push(sql`${auditLog.createdAt} >= ${new Date(filters.dateFrom)}`);
+  if (filters.dateTo) {
+    // Include the entire day of dateTo by setting time to end of day
+    const endOfDay = new Date(filters.dateTo);
+    endOfDay.setHours(23, 59, 59, 999);
+    conditions.push(sql`${auditLog.createdAt} <= ${endOfDay}`);
+  }
 
   const limit = filters.limit ?? 50;
   const offset = filters.offset ?? 0;

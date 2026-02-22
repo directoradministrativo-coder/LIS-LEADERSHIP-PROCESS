@@ -426,6 +426,8 @@ export const appRouter = router({
         action: z.enum(["create", "update", "delete"]).optional(),
         processId: z.number().optional(),
         processName: z.string().optional(),
+        dateFrom: z.string().optional(),
+        dateTo: z.string().optional(),
         limit: z.number().optional(),
         offset: z.number().optional(),
       }))

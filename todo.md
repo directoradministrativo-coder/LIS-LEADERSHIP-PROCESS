@@ -245,3 +245,14 @@
 - [x] Mostrar 50 registros por defecto en admin-historial.tsx
 - [x] Botón "Cargar más" para cargar siguientes 50 registros
 - [x] Contador de registros mostrados vs total
+
+## Feature v14 - Filtro de Fecha en Historial
+
+- [x] Endpoint audit.list acepta filtros dateFrom y dateTo (ISO string)
+- [x] Función getAuditLogs en db.ts aplica WHERE createdAt >= dateFrom AND createdAt <= dateTo (fin del día)
+- [x] Botón "Desde" en admin-historial.tsx: abre modal de entrada de fecha (AAAA-MM-DD)
+- [x] Botón "Hasta" en admin-historial.tsx: abre modal de entrada de fecha (AAAA-MM-DD)
+- [x] Validación de formato de fecha con mensaje de error
+- [x] Botón "Limpiar" individual por campo y botón "✕ Limpiar" para ambos filtros
+- [x] Indicador visual (color azul) cuando hay filtro de fecha activo
+- [x] Resetear visibleCount al aplicar o limpiar filtros de fecha
