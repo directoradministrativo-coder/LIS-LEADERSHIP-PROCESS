@@ -8,6 +8,7 @@ import { trpc } from "@/lib/trpc";
 import { useState, useMemo } from "react";
 import { useLisRole } from "./_layout";
 import { MaterialIcons } from "@expo/vector-icons";
+import { AdminNotificationBanner } from "@/components/admin-notification-banner";
 
 const FREQUENCY_OPTIONS = [
   { value: "dia", label: "Diario", icon: "📅" },
@@ -52,8 +53,22 @@ function AdminKPIsView() {
     return allData.filter(p => p.processId === selectedProcessId);
   }, [allData, selectedProcessId]);
 
+  const createNotification = trpc.notification.create.useMutation();
+
   const updateKPI = trpc.kpi.update.useMutation({
-    onSuccess: () => { allKPIsQuery.refetch(); setShowEditModal(false); setEditingId(null); setForm(EMPTY_FORM); },
+    onSuccess: (_data, variables) => {
+      allKPIsQuery.refetch();
+      // Find which process this KPI belongs to and notify
+      const processGroup = allData.find(p => p.kpis.some(k => k.id === variables.id));
+      if (processGroup) {
+        createNotification.mutate({
+          processId: processGroup.processId,
+          module: "kpis",
+          message: `Se modificó el KPI "${variables.name ?? ''}"`,
+        });
+      }
+      setShowEditModal(false); setEditingId(null); setForm(EMPTY_FORM);
+    },
   });
 
   const deleteKPI = trpc.kpi.delete.useMutation({
@@ -90,9 +105,19 @@ function AdminKPIsView() {
   };
 
   const handleDelete = (id: number, name: string) => {
+    const processGroup = allData.find(p => p.kpis.some(k => k.id === id));
     Alert.alert("Eliminar KPI", `¿Eliminar el KPI "${name}"?`, [
       { text: "Cancelar", style: "cancel" },
-      { text: "Eliminar", style: "destructive", onPress: () => deleteKPI.mutate({ id }) },
+      { text: "Eliminar", style: "destructive", onPress: () => {
+        deleteKPI.mutate({ id });
+        if (processGroup) {
+          createNotification.mutate({
+            processId: processGroup.processId,
+            module: "kpis",
+            message: `Se eliminó el KPI "${name}"`,
+          });
+        }
+      }},
     ]);
   };
 
@@ -298,6 +323,9 @@ function UserKPIsView() {
 
   return (
     <>
+      {/* Admin Notification Banner */}
+      <AdminNotificationBanner module="kpis" />
+
       {/* KPI Count Banner */}
       {kpis.length > 0 && (
         <View style={styles.countBanner}>

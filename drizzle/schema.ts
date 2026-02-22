@@ -275,3 +275,20 @@ export const auditLog = mysqlTable("auditLog", {
 
 export type AuditLog = typeof auditLog.$inferSelect;
 export type InsertAuditLog = typeof auditLog.$inferInsert;
+
+// ─── Process Notifications ──────────────────────────────────────────────────
+// Generic notification system for admin actions on any module.
+// Users see a banner when admin modifies their data.
+
+export const processNotifications = mysqlTable("processNotifications", {
+  id: int("id").autoincrement().primaryKey(),
+  processId: int("processId").notNull(),
+  module: mysqlEnum("module", ["kpis", "dofa", "interacciones", "proyectos", "organigrama"]).notNull(),
+  message: text("message").notNull(),
+  adminName: varchar("adminName", { length: 255 }),
+  isRead: boolean("isRead").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ProcessNotification = typeof processNotifications.$inferSelect;
+export type InsertProcessNotification = typeof processNotifications.$inferInsert;

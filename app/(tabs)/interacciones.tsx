@@ -9,6 +9,7 @@ import { useState, useMemo } from "react";
 import { useLocalSearchParams } from "expo-router";
 import { useLisRole } from "./_layout";
 import { MaterialIcons } from "@expo/vector-icons";
+import { AdminNotificationBanner } from "@/components/admin-notification-banner";
 
 const ANS_TYPES = [
   { value: "dias_calendario", label: "Días Calendario" },
@@ -48,6 +49,8 @@ function AdminInteraccionesView() {
   const allInteractionsQuery = trpc.admin.getAllInteractions.useQuery();
   const [selectedProcessId, setSelectedProcessId] = useState<number | null>(null);
   const [activeType, setActiveType] = useState<InteractionType>("proveedor");
+
+  const createNotification = trpc.notification.create.useMutation();
 
   const deleteInteractionAdmin = trpc.admin.deleteInteraction.useMutation({
     onSuccess: () => allInteractionsQuery.refetch(),
@@ -168,10 +171,22 @@ function AdminInteraccionesView() {
                     )}
                   </View>
                   <TouchableOpacity
-                    onPress={() => Alert.alert("Eliminar", `¿Eliminar "${interaction.relatedProcessName}"?`, [
-                      { text: "Cancelar", style: "cancel" },
-                      { text: "Eliminar", style: "destructive", onPress: () => deleteInteractionAdmin.mutate({ id: interaction.id }) },
-                    ])}
+                    onPress={() => {
+                      const pGroup = filteredData.find(p => p.interactions.some((i: any) => i.id === interaction.id));
+                      Alert.alert("Eliminar", `¿Eliminar "${interaction.relatedProcessName}"?`, [
+                        { text: "Cancelar", style: "cancel" },
+                        { text: "Eliminar", style: "destructive", onPress: () => {
+                          deleteInteractionAdmin.mutate({ id: interaction.id });
+                          if (pGroup) {
+                            createNotification.mutate({
+                              processId: pGroup.processId,
+                              module: "interacciones",
+                              message: `Se eliminó la interacción con "${interaction.relatedProcessName}"`,
+                            });
+                          }
+                        }},
+                      ]);
+                    }}
                     style={{ padding: 6 }}
                   >
                     <Text style={{ fontSize: 16 }}>🗑</Text>
@@ -436,6 +451,9 @@ export default function InteraccionesScreen() {
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* Admin Notification Banner */}
+      <AdminNotificationBanner module="interacciones" />
 
       {/* Section Description */}
       <View style={[styles.sectionDesc, { backgroundColor: config.bgColor }]}>

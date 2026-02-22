@@ -64,6 +64,13 @@
       "when": 1771729175084,
       "tag": "0008_dusty_firestar",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1771794397121,
+      "tag": "0009_even_hedge_knight",
+      "breakpoints": true
     }
   ]
 }

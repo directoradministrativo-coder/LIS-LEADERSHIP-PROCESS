@@ -106,6 +106,7 @@ import {
   projects,
   appConfig,
   auditLog,
+  processNotifications,
 } from "../drizzle/schema";
 import { and, ne, desc, sql } from "drizzle-orm";
 
@@ -1601,4 +1602,50 @@ export async function getAllProcessNames() {
   return allProcesses
     .filter(p => p.processName && p.processName.trim() !== "")
     .map(p => ({ id: p.id, processName: p.processName ?? "", areaName: p.areaName ?? "" }));
+}
+
+// ─── Process Notifications ──────────────────────────────────────────────────
+
+export async function createProcessNotification(
+  processId: number,
+  module: "kpis" | "dofa" | "interacciones" | "proyectos" | "organigrama",
+  message: string,
+  adminName?: string,
+) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(processNotifications).values({ processId, module, message, adminName });
+}
+
+export async function getProcessNotifications(
+  processId: number,
+  module?: "kpis" | "dofa" | "interacciones" | "proyectos" | "organigrama",
+) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [
+    eq(processNotifications.processId, processId),
+    eq(processNotifications.isRead, false),
+  ];
+  if (module) conditions.push(eq(processNotifications.module, module));
+  return db.select().from(processNotifications)
+    .where(and(...conditions))
+    .orderBy(desc(processNotifications.createdAt));
+}
+
+export async function dismissProcessNotification(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(processNotifications).set({ isRead: true }).where(eq(processNotifications.id, id));
+}
+
+export async function dismissAllProcessNotifications(processId: number, module: "kpis" | "dofa" | "interacciones" | "proyectos" | "organigrama") {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(processNotifications).set({ isRead: true })
+    .where(and(
+      eq(processNotifications.processId, processId),
+      eq(processNotifications.module, module),
+      eq(processNotifications.isRead, false),
+    ));
 }

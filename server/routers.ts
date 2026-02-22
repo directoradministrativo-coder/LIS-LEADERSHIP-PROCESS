@@ -357,6 +357,43 @@ export const appRouter = router({
       }),
   }),
 
+  // Process Notifications
+  notification: router({
+    // Get unread notifications for current user's process (optionally filtered by module)
+    list: protectedProcedure
+      .input(z.object({ module: z.enum(["kpis", "dofa", "interacciones", "proyectos", "organigrama"]).optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        const process = await db.getOrCreateProcess(ctx.user.id);
+        if (!process) return [];
+        return db.getProcessNotifications(process.id, input?.module);
+      }),
+    // Dismiss a single notification
+    dismiss: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(({ input }) => {
+        return db.dismissProcessNotification(input.id);
+      }),
+    // Dismiss all notifications for a module
+    dismissAll: protectedProcedure
+      .input(z.object({ module: z.enum(["kpis", "dofa", "interacciones", "proyectos", "organigrama"]) }))
+      .mutation(async ({ ctx, input }) => {
+        const process = await db.getOrCreateProcess(ctx.user.id);
+        if (!process) return;
+        return db.dismissAllProcessNotifications(process.id, input.module);
+      }),
+    // Create a notification (admin only)
+    create: protectedProcedure
+      .input(z.object({
+        processId: z.number(),
+        module: z.enum(["kpis", "dofa", "interacciones", "proyectos", "organigrama"]),
+        message: z.string(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
+        return db.createProcessNotification(input.processId, input.module, input.message, ctx.user.name ?? undefined);
+      }),
+  }),
+
   // Check if user is authorized (public - called after OAuth login)
   auth2: router({
     checkAuthorization: protectedProcedure.query(async ({ ctx }) => {

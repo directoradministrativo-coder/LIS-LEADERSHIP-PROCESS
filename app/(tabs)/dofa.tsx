@@ -7,6 +7,7 @@ import { trpc } from "@/lib/trpc";
 import { useState, useEffect, useMemo } from "react";
 import { useLisRole } from "./_layout";
 import { MaterialIcons } from "@expo/vector-icons";
+import { AdminNotificationBanner } from "@/components/admin-notification-banner";
 
 const DOFA_SECTIONS = [
   {
@@ -68,8 +69,20 @@ function AdminDofaView() {
   const [editData, setEditData] = useState<DofaData>({ debilidades: [], oportunidades: [], fortalezas: [], amenazas: [] });
   const [newItems, setNewItems] = useState<Record<string, string>>({ debilidades: "", oportunidades: "", fortalezas: "", amenazas: "" });
 
+  const createNotification = trpc.notification.create.useMutation();
+
   const saveDofaMut = trpc.admin.saveDofaByProcessId.useMutation({
-    onSuccess: () => { allDofaQuery.refetch(); setEditingProcessId(null); },
+    onSuccess: (_data, variables) => {
+      allDofaQuery.refetch();
+      // Notify the process owner about DOFA changes
+      const processGroup = allData.find(p => p.processId === variables.processId);
+      createNotification.mutate({
+        processId: variables.processId,
+        module: "dofa",
+        message: `Se modificó la matriz DOFA del proceso "${processGroup?.processName ?? ''}"`,
+      });
+      setEditingProcessId(null);
+    },
   });
 
   const allData = allDofaQuery.data ?? [];
@@ -335,6 +348,9 @@ function UserDofaView() {
 
   return (
     <>
+      {/* Admin Notification Banner */}
+      <AdminNotificationBanner module="dofa" />
+
       {/* Summary Banner */}
       {totalItems > 0 && (
         <View style={styles.summaryBanner}>

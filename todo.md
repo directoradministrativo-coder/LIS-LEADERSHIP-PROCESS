@@ -422,3 +422,31 @@
 ### Mejora Excel 3: Resumen estadístico en portada
 - [x] Portada del consolidado incluye resumen estadístico global (Total Colaboradores, KPIs, Proveedores, Clientes, Proyectos, Items DOFA)
 - [x] Tabla detallada por proceso con métricas individuales (Colaboradores, KPIs, Proveedores, Clientes, Proyectos, Items DOFA)
+
+## Ajuste v27 — Notificaciones + Historial en TODOS los módulos admin
+
+### Auditoría
+- [x] Auditar qué módulos tienen y cuáles faltan notificaciones + historial para acciones admin
+- [x] writeAuditLog ya existe en todos los endpoints de editar/eliminar (kpi.update, kpi.delete, interaction.delete, dofa.save, etc.)
+
+### Sistema de notificaciones genérico
+- [x] Tabla processNotifications creada con campos: processId, module (enum), message, adminName, isRead, createdAt
+- [x] Endpoints: notification.list (filtro por módulo), notification.dismiss, notification.dismissAll, notification.create (solo admin)
+- [x] Funciones DB: createProcessNotification, getProcessNotifications, dismissProcessNotification, dismissAllProcessNotifications
+
+### Notificaciones en KPIs admin
+- [x] Notificación al editar KPI desde admin (onSuccess de updateKPI)
+- [x] Notificación al eliminar KPI desde admin (onPress de handleDelete)
+
+### Notificaciones en DOFA admin
+- [x] Notificación al guardar cambios DOFA desde admin (onSuccess de saveDofaMut)
+
+### Notificaciones en Interacciones admin
+- [x] Notificación al eliminar interacción desde admin (onPress del botón eliminar)
+
+### UI de notificaciones en vistas user
+- [x] Componente reutilizable AdminNotificationBanner con icono, badge de conteo, mensaje y botón cerrar
+- [x] Banner en KPIs user (arriba del count banner)
+- [x] Banner en DOFA user (arriba del summary banner)
+- [x] Banner en Interacciones user (arriba de la descripción de sección)
+- [x] Botón para descartar todas las notificaciones del módulo (dismissAll)
