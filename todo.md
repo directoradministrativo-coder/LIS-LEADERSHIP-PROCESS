@@ -137,3 +137,8 @@
 - [x] Bug: pestaña "Usuarios" no visible para admin/superadmin (isAdmin basado en rol OAuth, no en tabla LIS)
 - [x] Corregir: usar rol del checkAuthorization (tabla LIS) para mostrar/ocultar pestaña Usuarios
 - [x] Verificar que botón de configuración en header navega correctamente a pestaña Usuarios
+
+## Feature v8 - Indicador de Progreso
+- [x] Crear endpoint trpc para consultar el progreso por módulo (cuántos tienen registros)
+- [x] Agregar barra de progreso visual en el dashboard (X de 5 módulos completados)
+- [x] Mostrar estado individual por módulo (completado/pendiente) en las tarjetas del dashboard

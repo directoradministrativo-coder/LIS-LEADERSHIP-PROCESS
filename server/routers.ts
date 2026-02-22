@@ -314,6 +314,14 @@ export const appRouter = router({
       }),
   }),
 
+  // Module progress tracking
+  progress: router({
+    // Returns completion status for each of the 5 modules
+    get: protectedProcedure.query(async ({ ctx }) => {
+      return db.getModuleProgress(ctx.user.id);
+    }),
+  }),
+
   // Export data for Excel
   export: router({
     orgChart: protectedProcedure.query(({ ctx }) => {

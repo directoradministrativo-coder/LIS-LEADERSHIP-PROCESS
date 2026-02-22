@@ -51,6 +51,22 @@ export default function HomeScreen() {
     retry: false,
   });
 
+  const progressQuery = trpc.progress.get.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: true,
+  });
+
+  const progress = progressQuery.data;
+
+  // Map module id to progress status
+  const moduleStatus: Record<string, boolean> = {
+    organigrama: progress?.organigrama ?? false,
+    kpis: progress?.kpis ?? false,
+    dofa: progress?.dofa ?? false,
+    proveedores: progress?.proveedores ?? false,
+    clientes: progress?.clientes ?? false,
+  };
+
   const updateProcess = trpc.process.update.useMutation({
     onSuccess: () => {
       processQuery.refetch();
@@ -176,25 +192,67 @@ export default function HomeScreen() {
           )}
         </View>
 
+        {/* Progress Indicator */}
+        <View style={styles.progressSection}>
+          <View style={styles.progressHeader}>
+            <Text style={styles.sectionLabel}>PROGRESO DEL LEVANTAMIENTO</Text>
+            <Text style={styles.progressCount}>
+              {progress?.completedCount ?? 0} de {progress?.totalCount ?? 5} módulos
+            </Text>
+          </View>
+          <View style={styles.progressBarBg}>
+            <View
+              style={[
+                styles.progressBarFill,
+                {
+                  width: `${Math.round(((progress?.completedCount ?? 0) / (progress?.totalCount ?? 5)) * 100)}%`,
+                  backgroundColor:
+                    (progress?.completedCount ?? 0) === 5
+                      ? "#5CB85C"
+                      : (progress?.completedCount ?? 0) >= 3
+                      ? "#F5A623"
+                      : "#CC2229",
+                },
+              ]}
+            />
+          </View>
+          <Text style={styles.progressPercent}>
+            {Math.round(((progress?.completedCount ?? 0) / (progress?.totalCount ?? 5)) * 100)}% completado
+          </Text>
+        </View>
+
         {/* Modules Grid */}
         <View style={styles.modulesSection}>
           <Text style={styles.sectionLabel}>MÓDULOS DEL LEVANTAMIENTO</Text>
           <View style={styles.modulesGrid}>
-            {MODULES.map((module) => (
-              <TouchableOpacity
-                key={module.id}
-                style={[styles.moduleCard, { borderLeftColor: module.color }]}
-                onPress={() => router.push(module.route as any)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.moduleIcon}>{module.icon}</Text>
-                <View style={styles.moduleInfo}>
-                  <Text style={styles.moduleTitle}>{module.title}</Text>
-                  <Text style={styles.moduleDescription}>{module.description}</Text>
-                </View>
-                <Text style={styles.moduleArrow}>›</Text>
-              </TouchableOpacity>
-            ))}
+            {MODULES.map((module) => {
+              const done = moduleStatus[module.id] ?? false;
+              return (
+                <TouchableOpacity
+                  key={module.id}
+                  style={[styles.moduleCard, { borderLeftColor: done ? "#5CB85C" : module.color }]}
+                  onPress={() => router.push(module.route as any)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.moduleIcon}>{module.icon}</Text>
+                  <View style={styles.moduleInfo}>
+                    <Text style={styles.moduleTitle}>{module.title}</Text>
+                    <Text style={styles.moduleDescription}>{module.description}</Text>
+                  </View>
+                  <View style={styles.moduleStatusBadge}>
+                    {done ? (
+                      <View style={styles.badgeDone}>
+                        <Text style={styles.badgeDoneText}>✓</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.badgePending}>
+                        <Text style={styles.badgePendingText}>Pendiente</Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
@@ -424,6 +482,74 @@ const styles = StyleSheet.create({
     fontSize: 22,
     color: "#9CA3AF",
     fontWeight: "300",
+  },
+  progressSection: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 4,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  progressHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  progressCount: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#1B4F9B",
+  },
+  progressBarBg: {
+    height: 10,
+    backgroundColor: "#F3F4F6",
+    borderRadius: 5,
+    overflow: "hidden",
+    marginBottom: 6,
+  },
+  progressBarFill: {
+    height: 10,
+    borderRadius: 5,
+  },
+  progressPercent: {
+    fontSize: 12,
+    color: "#6B7280",
+    textAlign: "right",
+  },
+  moduleStatusBadge: {
+    marginLeft: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badgeDone: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#DCFCE7",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  badgeDoneText: {
+    fontSize: 14,
+    color: "#16A34A",
+    fontWeight: "700",
+  },
+  badgePending: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    backgroundColor: "#FEF9C3",
+    borderWidth: 1,
+    borderColor: "#FDE047",
+  },
+  badgePendingText: {
+    fontSize: 10,
+    color: "#854D0E",
+    fontWeight: "600",
   },
   footer: {
     marginTop: 8,

@@ -611,3 +611,53 @@ export async function getAllProcessesData() {
 
   return result;
 }
+
+// ─── Module Progress ──────────────────────────────────────────────────────────
+
+export async function getModuleProgress(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const process = await db.select().from(processes).where(eq(processes.userId, userId)).limit(1);
+  if (!process.length) {
+    return {
+      organigrama: false,
+      kpis: false,
+      dofa: false,
+      proveedores: false,
+      clientes: false,
+      completedCount: 0,
+      totalCount: 5,
+    };
+  }
+
+  const processId = process[0].id;
+
+  const [hierarchyRows, kpiRows, dofaRows, proveedorRows, clienteRows] = await Promise.all([
+    db.select().from(orgHierarchies).where(eq(orgHierarchies.processId, processId)).limit(1),
+    db.select().from(kpis).where(eq(kpis.processId, processId)).limit(1),
+    db.select().from(dofaMatrix).where(eq(dofaMatrix.processId, processId)).limit(1),
+    db.select().from(processInteractions).where(
+      and(eq(processInteractions.processId, processId), eq(processInteractions.type, "proveedor"))
+    ).limit(1),
+    db.select().from(processInteractions).where(
+      and(eq(processInteractions.processId, processId), eq(processInteractions.type, "cliente"))
+    ).limit(1),
+  ]);
+
+  const status = {
+    organigrama: hierarchyRows.length > 0,
+    kpis: kpiRows.length > 0,
+    dofa: dofaRows.length > 0,
+    proveedores: proveedorRows.length > 0,
+    clientes: clienteRows.length > 0,
+  };
+
+  const completedCount = Object.values(status).filter(Boolean).length;
+
+  return {
+    ...status,
+    completedCount,
+    totalCount: 5,
+  };
+}
