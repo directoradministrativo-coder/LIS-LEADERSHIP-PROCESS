@@ -71,6 +71,17 @@ export default function DofaScreen() {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [observations, setObservations] = useState("");
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const observationQuery = trpc.observation.get.useQuery({ module: "dofa" });
+  const saveObservation = trpc.observation.save.useMutation();
+
+  useEffect(() => {
+    if (observationQuery.data?.observations) {
+      setObservations(observationQuery.data.observations);
+    }
+  }, [observationQuery.data]);
 
   const dofaQuery = trpc.dofa.get.useQuery();
   const saveDofa = trpc.dofa.save.useMutation({
@@ -109,8 +120,17 @@ export default function DofaScreen() {
   };
 
   const handleSave = () => {
+    const totalItems = Object.values(data).reduce((sum, arr) => sum + arr.length, 0);
+    if (totalItems === 0) {
+      setSaveError("⚠️ Debes agregar al menos un elemento en cualquier cuadrante del DOFA antes de guardar.");
+      return;
+    }
+    setSaveError(null);
     setIsSaving(true);
     saveDofa.mutate(data);
+    if (observations.trim()) {
+      saveObservation.mutate({ module: "dofa", observations });
+    }
   };
 
   const totalItems = Object.values(data).reduce((sum, arr) => sum + arr.length, 0);
@@ -209,6 +229,27 @@ export default function DofaScreen() {
           ))
         )}
 
+        {/* Observations */}
+        <View style={styles.observationsCard}>
+          <Text style={styles.observationsLabel}>Observaciones Generales</Text>
+          <TextInput
+            style={styles.observationsInput}
+            value={observations}
+            onChangeText={v => { setObservations(v); setHasChanges(true); }}
+            placeholder="Observaciones adicionales sobre el análisis DOFA del proceso..."
+            placeholderTextColor="#9CA3AF"
+            multiline
+            textAlignVertical="top"
+          />
+        </View>
+
+        {/* Save error */}
+        {saveError && (
+          <View style={styles.saveErrorBox}>
+            <Text style={styles.saveErrorText}>{saveError}</Text>
+          </View>
+        )}
+
         {/* Save Button at bottom */}
         {hasChanges && (
           <TouchableOpacity style={styles.bottomSaveBtn} onPress={handleSave} disabled={isSaving}>
@@ -276,4 +317,38 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
   },
   bottomSaveBtnText: { color: "#FFF", fontWeight: "700", fontSize: 16 },
+  observationsCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    padding: 14,
+    marginBottom: 12,
+  },
+  observationsLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#6B7280",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  observationsInput: {
+    borderWidth: 1.5,
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    padding: 10,
+    fontSize: 14,
+    color: "#1A1A2E",
+    minHeight: 80,
+  },
+  saveErrorBox: {
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  saveErrorText: { fontSize: 13, color: "#CC2229", fontWeight: "600" },
 });

@@ -25,6 +25,7 @@ type TaskForm = {
   ansNumber?: number;
   ansType?: AnsType;
   ansCompliance?: number;
+  observations?: string;
 };
 
 const EMPTY_TASK: TaskForm = {
@@ -35,6 +36,7 @@ const EMPTY_TASK: TaskForm = {
   ansNumber: undefined,
   ansType: "dias_habiles",
   ansCompliance: undefined,
+  observations: "",
 };
 
 export default function InteraccionesScreen() {
@@ -46,8 +48,10 @@ export default function InteraccionesScreen() {
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [showStrengthModal, setShowStrengthModal] = useState(false);
   const [newInteractionName, setNewInteractionName] = useState("");
+  const [interactionNameError, setInteractionNameError] = useState("");
   const [selectedInteractionId, setSelectedInteractionId] = useState<number | null>(null);
   const [taskForm, setTaskForm] = useState<TaskForm>(EMPTY_TASK);
+  const [taskErrors, setTaskErrors] = useState<string[]>([]);
   const [newStrengthType, setNewStrengthType] = useState<"fortaleza" | "oportunidad">("fortaleza");
   const [newStrengthText, setNewStrengthText] = useState("");
   const [expandedInteractionId, setExpandedInteractionId] = useState<number | null>(null);
@@ -92,21 +96,29 @@ export default function InteraccionesScreen() {
 
   const handleAddInteraction = () => {
     if (!newInteractionName.trim()) {
-      Alert.alert("Error", "Ingresa el nombre del proceso");
+      setInteractionNameError("⚠️ El nombre del proceso es obligatorio");
       return;
     }
+    setInteractionNameError("");
     createInteraction.mutate({ type: activeType, relatedProcessName: newInteractionName.trim() });
   };
 
+  const validateTask = (): boolean => {
+    const errors: string[] = [];
+    if (!taskForm.taskActivity.trim()) errors.push("• Tarea / Actividad es obligatoria");
+    if (!taskForm.documentRoute.trim()) errors.push("• Documento / Ruta es obligatorio");
+    if (!taskForm.responsibleRole.trim()) errors.push("• Responsable es obligatorio");
+    if (!taskForm.ansUndefined) {
+      if (!taskForm.ansNumber) errors.push("• Número de días del ANS es obligatorio");
+      if (!taskForm.ansType) errors.push("• Tipo de ANS (días calendario/hábiles) es obligatorio");
+      if (!taskForm.ansCompliance) errors.push("• Nivel de cumplimiento ANS es obligatorio");
+    }
+    setTaskErrors(errors);
+    return errors.length === 0;
+  };
+
   const handleAddTask = () => {
-    if (!taskForm.taskActivity.trim() || !taskForm.documentRoute.trim() || !taskForm.responsibleRole.trim()) {
-      Alert.alert("Campos requeridos", "Completa Actividad, Documento/Ruta y Responsable");
-      return;
-    }
-    if (!taskForm.ansUndefined && (!taskForm.ansNumber || !taskForm.ansType || !taskForm.ansCompliance)) {
-      Alert.alert("ANS requerido", "Completa el ANS o marca como 'No definido'");
-      return;
-    }
+    if (!validateTask()) return;
     createTask.mutate({
       interactionId: selectedInteractionId!,
       taskActivity: taskForm.taskActivity.trim(),
@@ -288,11 +300,12 @@ export default function InteraccionesScreen() {
             <Text style={styles.modalTitle}>
               Agregar {activeType === "proveedor" ? "Proveedor" : "Cliente"}
             </Text>
-            <Text style={styles.inputLabel}>Nombre del Proceso</Text>
+              <Text style={styles.inputLabel}>Nombre del Proceso *</Text>
+            {interactionNameError ? <Text style={styles.fieldError}>{interactionNameError}</Text> : null}
             <TextInput
-              style={styles.input}
+              style={[styles.input, interactionNameError ? styles.inputError : null]}
               value={newInteractionName}
-              onChangeText={setNewInteractionName}
+              onChangeText={v => { setNewInteractionName(v); setInteractionNameError(""); }}
               placeholder={activeType === "proveedor" ? "Ej: Proceso de Compras" : "Ej: Proceso de Ventas"}
               placeholderTextColor="#9CA3AF"
               autoFocus
@@ -316,14 +329,21 @@ export default function InteraccionesScreen() {
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Nueva Tarea / Actividad</Text>
 
+              {taskErrors.length > 0 && (
+                <View style={styles.errorBox}>
+                  <Text style={styles.errorTitle}>⚠️ Campos obligatorios incompletos:</Text>
+                  {taskErrors.map((e, i) => <Text key={i} style={styles.errorItem}>{e}</Text>)}
+                </View>
+              )}
+
               <Text style={styles.inputLabel}>Tarea / Actividad *</Text>
-              <TextInput style={[styles.input, { minHeight: 60 }]} value={taskForm.taskActivity} onChangeText={v => setTaskForm(f => ({ ...f, taskActivity: v }))} placeholder="Describe la tarea o actividad" placeholderTextColor="#9CA3AF" multiline />
+              <TextInput style={[styles.input, { minHeight: 60 }, taskErrors.some(e => e.includes("Tarea")) && styles.inputError]} value={taskForm.taskActivity} onChangeText={v => setTaskForm(f => ({ ...f, taskActivity: v }))} placeholder="Describe la tarea o actividad" placeholderTextColor="#9CA3AF" multiline />
 
               <Text style={styles.inputLabel}>Documento / Ruta *</Text>
-              <TextInput style={styles.input} value={taskForm.documentRoute} onChangeText={v => setTaskForm(f => ({ ...f, documentRoute: v }))} placeholder="Ej: Formato FO-LOG-001" placeholderTextColor="#9CA3AF" />
+              <TextInput style={[styles.input, taskErrors.some(e => e.includes("Documento")) && styles.inputError]} value={taskForm.documentRoute} onChangeText={v => setTaskForm(f => ({ ...f, documentRoute: v }))} placeholder="Ej: Formato FO-LOG-001" placeholderTextColor="#9CA3AF" />
 
               <Text style={styles.inputLabel}>Responsable *</Text>
-              <TextInput style={styles.input} value={taskForm.responsibleRole} onChangeText={v => setTaskForm(f => ({ ...f, responsibleRole: v }))} placeholder="Ej: Coordinador de Logística" placeholderTextColor="#9CA3AF" />
+              <TextInput style={[styles.input, taskErrors.some(e => e.includes("Responsable")) && styles.inputError]} value={taskForm.responsibleRole} onChangeText={v => setTaskForm(f => ({ ...f, responsibleRole: v }))} placeholder="Ej: Coordinador de Logística" placeholderTextColor="#9CA3AF" />
 
               <Text style={styles.sectionSubTitle}>ANS (Acuerdo de Nivel de Servicio)</Text>
 
@@ -357,7 +377,7 @@ export default function InteraccionesScreen() {
                           onPress={() => setTaskForm(f => ({ ...f, ansType: t.value }))}
                         >
                           <Text style={[styles.ansTypeBtnText, taskForm.ansType === t.value && styles.ansTypeBtnTextActive]}>
-                            {t.label.split(" ")[0]}
+                            {t.label}
                           </Text>
                         </TouchableOpacity>
                       ))}
@@ -379,8 +399,18 @@ export default function InteraccionesScreen() {
                 </>
               )}
 
+              <Text style={styles.inputLabel}>Observaciones</Text>
+              <TextInput
+                style={[styles.input, { minHeight: 60 }]}
+                value={taskForm.observations ?? ""}
+                onChangeText={v => setTaskForm(f => ({ ...f, observations: v }))}
+                placeholder="Observaciones adicionales sobre esta tarea..."
+                placeholderTextColor="#9CA3AF"
+                multiline
+              />
+
               <View style={styles.modalActions}>
-                <TouchableOpacity style={styles.cancelModalBtn} onPress={() => { setShowTaskModal(false); setTaskForm(EMPTY_TASK); }}>
+                <TouchableOpacity style={styles.cancelModalBtn} onPress={() => { setShowTaskModal(false); setTaskForm(EMPTY_TASK); setTaskErrors([]); }}>
                   <Text style={styles.cancelModalText}>Cancelar</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.saveModalBtn} onPress={handleAddTask} disabled={createTask.isPending}>
@@ -492,7 +522,12 @@ const styles = StyleSheet.create({
   checkLabel: { fontSize: 14, color: "#374151", fontWeight: "500" },
   ansRow: { flexDirection: "row", gap: 8, marginBottom: 14 },
   ansTypeSelector: { flex: 2, flexDirection: "row", flexWrap: "wrap", gap: 4 },
-  ansTypeBtn: { paddingHorizontal: 8, paddingVertical: 6, borderRadius: 6, backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB" },
+  ansTypeBtn: { paddingHorizontal: 6, paddingVertical: 6, borderRadius: 6, backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB" },
+  errorBox: { backgroundColor: "#FEF2F2", borderWidth: 1, borderColor: "#FECACA", borderRadius: 8, padding: 12, marginBottom: 14 },
+  errorTitle: { fontSize: 13, fontWeight: "700", color: "#CC2229", marginBottom: 4 },
+  errorItem: { fontSize: 12, color: "#CC2229", lineHeight: 20 },
+  inputError: { borderColor: "#CC2229", backgroundColor: "#FEF2F2" },
+  fieldError: { fontSize: 12, color: "#CC2229", marginBottom: 4, fontWeight: "600" },
   ansTypeBtnActive: { backgroundColor: "#1B4F9B", borderColor: "#1B4F9B" },
   ansTypeBtnText: { fontSize: 11, fontWeight: "600", color: "#374151" },
   ansTypeBtnTextActive: { color: "#FFF" },

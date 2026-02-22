@@ -82,3 +82,35 @@
 - [x] Tests de servidor (API health, auth, KPIs, DOFA) - 9/9 pasando
 - [x] Revisión de identidad visual LIS
 - [x] TypeScript sin errores
+
+## Ajustes v2 - Roles, Organigrama Visual, Validaciones
+
+### Sistema de Roles
+- [x] Agregar campo `role` (user/admin) a la tabla de usuarios autorizados
+- [x] Crear tabla `authorizedUsers` con email, nombre, área, rol
+- [x] Pantalla de administración de usuarios (agregar/importar CSV)
+- [x] Validar usuario en lista cerrada al momento del login
+- [x] Mostrar mensaje de "no autorizado" si el email no está en la lista
+- [x] Enrolamiento automático con Gmail si es primera vez
+- [x] Panel de administrador: ver todos los procesos registrados
+- [x] Descarga consolidada (todos los procesos) o selección individual para admin
+
+### Organigrama Visual
+- [x] Nueva pestaña "Vista Organigrama" habilitada después de completar el módulo
+- [x] Visualización gráfica SVG/Canvas del organigrama del proceso (vista usuario)
+- [x] Botón mostrar/ocultar funciones en cada nodo del organigrama
+- [x] Vista administrador: organigrama consolidado de todos los procesos
+
+### Validaciones de Campos Obligatorios
+- [x] Validación en módulo Proceso (nombre del proceso, área)
+- [x] Validación en módulo Organigrama (nombre del colaborador obligatorio)
+- [x] Validación en módulo KPIs (todos los campos obligatorios)
+- [x] Validación en módulo DOFA (al menos un ítem por cuadrante)
+- [x] Validación en módulo Interacciones (campos obligatorios ANS)
+- [x] Cuadro de texto con lista de campos faltantes al intentar guardar
+
+### Correcciones y Mejoras
+- [x] Corregir opciones ANS: "Días calendario", "Días hábiles", "Semanas", "Meses"
+- [x] Agregar campo "Observaciones" en módulo Interacciones (Proveedores/Clientes)
+- [x] Agregar campo "Observaciones" en módulo KPIs
+- [x] Agregar campo "Observaciones" en módulo DOFA

@@ -99,6 +99,7 @@ export const kpis = mysqlTable("kpis", {
   frequency: mysqlEnum("frequency", ["dia", "semana", "mes"]).notNull(),
   formula: text("formula").notNull(),
   responsible: varchar("responsible", { length: 255 }).notNull(),
+  observations: text("observations"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -152,6 +153,7 @@ export const interactionTasks = mysqlTable("interactionTasks", {
   ansNumber: int("ansNumber"), // 1-9
   ansType: mysqlEnum("ansType", ["dias_calendario", "dias_habiles", "semanas", "meses"]),
   ansCompliance: int("ansCompliance"), // 1-5, null si ansUndefined=true
+  observations: text("observations"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -172,3 +174,36 @@ export const interactionStrengths = mysqlTable("interactionStrengths", {
 
 export type InteractionStrength = typeof interactionStrengths.$inferSelect;
 export type InsertInteractionStrength = typeof interactionStrengths.$inferInsert;
+
+/**
+ * Lista cerrada de usuarios autorizados para ingresar a la app
+ */
+export const authorizedUsers = mysqlTable("authorizedUsers", {
+  id: int("id").autoincrement().primaryKey(),
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  areaName: varchar("areaName", { length: 255 }),
+  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  isEnrolled: boolean("isEnrolled").default(false).notNull(),
+  enrolledAt: timestamp("enrolledAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AuthorizedUser = typeof authorizedUsers.$inferSelect;
+export type InsertAuthorizedUser = typeof authorizedUsers.$inferInsert;
+
+/**
+ * Observaciones por módulo (KPIs, Interacciones)
+ */
+export const moduleObservations = mysqlTable("moduleObservations", {
+  id: int("id").autoincrement().primaryKey(),
+  processId: int("processId").notNull(),
+  module: mysqlEnum("module", ["kpi", "proveedor", "cliente", "dofa", "organigrama"]).notNull(),
+  observations: text("observations"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ModuleObservation = typeof moduleObservations.$inferSelect;
+export type InsertModuleObservation = typeof moduleObservations.$inferInsert;

@@ -101,8 +101,10 @@ import {
   processInteractions,
   interactionTasks,
   interactionStrengths,
+  authorizedUsers,
+  moduleObservations,
 } from "../drizzle/schema";
-import { and } from "drizzle-orm";
+import { and, ne } from "drizzle-orm";
 
 // ============================================================
 // PROCESSES
@@ -484,4 +486,122 @@ export async function getInteractionsExportData(userId: number) {
   }
 
   return { process: process[0], interactions: result };
+}
+
+// ============================================================
+// AUTHORIZED USERS (Lista cerrada)
+// ============================================================
+
+export async function getAuthorizedUsers() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(authorizedUsers);
+}
+
+export async function getAuthorizedUserByEmail(email: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(authorizedUsers).where(eq(authorizedUsers.email, email.toLowerCase())).limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function createAuthorizedUser(data: { email: string; name: string; areaName?: string; role?: "user" | "admin" }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(authorizedUsers).values({
+    email: data.email.toLowerCase(),
+    name: data.name,
+    areaName: data.areaName,
+    role: data.role ?? "user",
+  });
+  const created = await db.select().from(authorizedUsers).where(eq(authorizedUsers.email, data.email.toLowerCase())).limit(1);
+  return created[0];
+}
+
+export async function updateAuthorizedUser(id: number, data: Partial<{ name: string; areaName: string; role: "user" | "admin"; isEnrolled: boolean; enrolledAt: Date }>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(authorizedUsers).set(data).where(eq(authorizedUsers.id, id));
+}
+
+export async function deleteAuthorizedUser(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(authorizedUsers).where(eq(authorizedUsers.id, id));
+}
+
+export async function markUserAsEnrolled(email: string) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(authorizedUsers)
+    .set({ isEnrolled: true, enrolledAt: new Date() })
+    .where(eq(authorizedUsers.email, email.toLowerCase()));
+}
+
+// ============================================================
+// MODULE OBSERVATIONS
+// ============================================================
+
+export async function getModuleObservation(userId: number, module: "kpi" | "proveedor" | "cliente" | "dofa" | "organigrama") {
+  const db = await getDb();
+  if (!db) return null;
+  const process = await db.select().from(processes).where(eq(processes.userId, userId)).limit(1);
+  if (process.length === 0) return null;
+  const result = await db.select().from(moduleObservations)
+    .where(and(eq(moduleObservations.processId, process[0].id), eq(moduleObservations.module, module)))
+    .limit(1);
+  return result.length > 0 ? result[0] : null;
+}
+
+export async function saveModuleObservation(userId: number, module: "kpi" | "proveedor" | "cliente" | "dofa" | "organigrama", observations: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const process = await getOrCreateProcess(userId);
+  const existing = await db.select().from(moduleObservations)
+    .where(and(eq(moduleObservations.processId, process.id), eq(moduleObservations.module, module)))
+    .limit(1);
+  if (existing.length === 0) {
+    await db.insert(moduleObservations).values({ processId: process.id, module, observations });
+  } else {
+    await db.update(moduleObservations).set({ observations }).where(eq(moduleObservations.id, existing[0].id));
+  }
+}
+
+// ============================================================
+// ADMIN: All processes data
+// ============================================================
+
+export async function getAllProcessesData() {
+  const db = await getDb();
+  if (!db) return [];
+
+  const allProcesses = await db.select().from(processes);
+  const result = [];
+
+  for (const process of allProcesses) {
+    const user = await db.select().from(users).where(eq(users.id, process.userId)).limit(1);
+    const hierarchies = await db.select().from(orgHierarchies).where(eq(orgHierarchies.processId, process.id));
+    const collaborators = await db.select().from(orgCollaborators).where(eq(orgCollaborators.processId, process.id));
+    const kpiList = await db.select().from(kpis).where(eq(kpis.processId, process.id));
+    const dofaRow = await db.select().from(dofaMatrix).where(eq(dofaMatrix.processId, process.id)).limit(1);
+    const interactions = await db.select().from(processInteractions).where(eq(processInteractions.processId, process.id));
+
+    result.push({
+      process,
+      user: user[0] ?? null,
+      hierarchies,
+      collaborators,
+      kpis: kpiList,
+      dofa: dofaRow.length > 0 ? {
+        ...dofaRow[0],
+        debilidades: JSON.parse(dofaRow[0].debilidades || "[]") as string[],
+        oportunidades: JSON.parse(dofaRow[0].oportunidades || "[]") as string[],
+        fortalezas: JSON.parse(dofaRow[0].fortalezas || "[]") as string[],
+        amenazas: JSON.parse(dofaRow[0].amenazas || "[]") as string[],
+      } : null,
+      interactions,
+    });
+  }
+
+  return result;
 }

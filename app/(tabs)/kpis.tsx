@@ -20,6 +20,7 @@ type KPIForm = {
   frequency: Frequency;
   formula: string;
   responsible: string;
+  observations: string;
 };
 
 const EMPTY_FORM: KPIForm = {
@@ -28,12 +29,14 @@ const EMPTY_FORM: KPIForm = {
   frequency: "mes",
   formula: "",
   responsible: "",
+  observations: "",
 };
 
 export default function KPIsScreen() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<KPIForm>(EMPTY_FORM);
+  const [formErrors, setFormErrors] = useState<string[]>([]);
 
   const kpisQuery = trpc.kpi.list.useQuery();
 
@@ -49,11 +52,18 @@ export default function KPIsScreen() {
     onSuccess: () => kpisQuery.refetch(),
   });
 
+  const validateForm = (): boolean => {
+    const errors: string[] = [];
+    if (!form.name.trim()) errors.push("• Nombre del KPI es obligatorio");
+    if (!form.objective.trim()) errors.push("• Objetivo es obligatorio");
+    if (!form.formula.trim()) errors.push("• Fórmula de cálculo es obligatoria");
+    if (!form.responsible.trim()) errors.push("• Responsable es obligatorio");
+    setFormErrors(errors);
+    return errors.length === 0;
+  };
+
   const handleSave = () => {
-    if (!form.name.trim() || !form.objective.trim() || !form.formula.trim() || !form.responsible.trim()) {
-      Alert.alert("Campos requeridos", "Por favor completa todos los campos del KPI");
-      return;
-    }
+    if (!validateForm()) return;
     if (editingId) {
       updateKPI.mutate({ id: editingId, ...form });
     } else {
@@ -68,8 +78,10 @@ export default function KPIsScreen() {
       frequency: kpi.frequency,
       formula: kpi.formula,
       responsible: kpi.responsible,
+      observations: kpi.observations ?? "",
     });
     setEditingId(kpi.id);
+    setFormErrors([]);
     setShowAddModal(true);
   };
 
@@ -162,11 +174,19 @@ export default function KPIsScreen() {
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>{editingId ? "Editar KPI" : "Nuevo KPI"}</Text>
 
+              {formErrors.length > 0 && (
+                <View style={styles.errorBox}>
+                  <Text style={styles.errorTitle}>⚠️ Campos obligatorios incompletos:</Text>
+                  {formErrors.map((e, i) => <Text key={i} style={styles.errorItem}>{e}</Text>)}
+                </View>
+              )}
+
               <FormField
                 label="Nombre del KPI *"
                 value={form.name}
                 onChangeText={v => setForm(f => ({ ...f, name: v }))}
                 placeholder="Ej: Nivel de Servicio al Cliente"
+                hasError={formErrors.some(e => e.includes("Nombre"))}
               />
               <FormField
                 label="Objetivo *"
@@ -174,6 +194,7 @@ export default function KPIsScreen() {
                 onChangeText={v => setForm(f => ({ ...f, objective: v }))}
                 placeholder="Ej: Medir el porcentaje de pedidos entregados a tiempo"
                 multiline
+                hasError={formErrors.some(e => e.includes("Objetivo"))}
               />
               <FormField
                 label="Fórmula de Cálculo *"
@@ -182,12 +203,22 @@ export default function KPIsScreen() {
                 placeholder="Ej: (Pedidos entregados a tiempo / Total pedidos) × 100"
                 multiline
                 isFormula
+                hasError={formErrors.some(e => e.includes("Fórmula"))}
               />
               <FormField
                 label="Responsable *"
                 value={form.responsible}
                 onChangeText={v => setForm(f => ({ ...f, responsible: v }))}
                 placeholder="Ej: Gerente de Operaciones"
+                hasError={formErrors.some(e => e.includes("Responsable"))}
+              />
+
+              <FormField
+                label="Observaciones"
+                value={form.observations}
+                onChangeText={v => setForm(f => ({ ...f, observations: v }))}
+                placeholder="Observaciones adicionales sobre este KPI..."
+                multiline
               />
 
               <Text style={styles.inputLabel}>Frecuencia de Medición *</Text>
@@ -242,15 +273,15 @@ function KPIField({ label, value, isFormula }: { label: string; value: string; i
   );
 }
 
-function FormField({ label, value, onChangeText, placeholder, multiline, isFormula }: {
+function FormField({ label, value, onChangeText, placeholder, multiline, isFormula, hasError }: {
   label: string; value: string; onChangeText: (v: string) => void;
-  placeholder?: string; multiline?: boolean; isFormula?: boolean;
+  placeholder?: string; multiline?: boolean; isFormula?: boolean; hasError?: boolean;
 }) {
   return (
     <View style={{ marginBottom: 14 }}>
       <Text style={styles.inputLabel}>{label}</Text>
       <TextInput
-        style={[styles.input, multiline && { minHeight: 72 }, isFormula && styles.formulaInput]}
+        style={[styles.input, multiline && { minHeight: 72 }, isFormula && styles.formulaInput, hasError && styles.inputError]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
@@ -322,4 +353,15 @@ const styles = StyleSheet.create({
   cancelModalText: { color: "#6B7280", fontWeight: "600", fontSize: 15 },
   saveModalBtn: { flex: 1, backgroundColor: "#CC2229", paddingVertical: 13, borderRadius: 10, alignItems: "center" },
   saveModalText: { color: "#FFF", fontWeight: "700", fontSize: 15 },
+  errorBox: {
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 14,
+  },
+  errorTitle: { fontSize: 13, fontWeight: "700", color: "#CC2229", marginBottom: 4 },
+  errorItem: { fontSize: 12, color: "#CC2229", lineHeight: 20 },
+  inputError: { borderColor: "#CC2229", backgroundColor: "#FEF2F2" },
 });

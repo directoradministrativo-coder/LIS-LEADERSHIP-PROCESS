@@ -236,6 +236,81 @@ export const appRouter = router({
       }),
   }),
 
+  // Admin: manage authorized users
+  admin: router({
+    // Get all authorized users (admin only)
+    listAuthorizedUsers: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new Error("UNAUTHORIZED");
+      return db.getAuthorizedUsers();
+    }),
+    createAuthorizedUser: protectedProcedure
+      .input(z.object({
+        email: z.string().email(),
+        name: z.string().min(1).max(255),
+        areaName: z.string().optional(),
+        role: z.enum(["user", "admin"]).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new Error("UNAUTHORIZED");
+        return db.createAuthorizedUser(input);
+      }),
+    updateAuthorizedUser: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        name: z.string().min(1).max(255).optional(),
+        areaName: z.string().optional(),
+        role: z.enum(["user", "admin"]).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new Error("UNAUTHORIZED");
+        return db.updateAuthorizedUser(input.id, input);
+      }),
+    deleteAuthorizedUser: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin") throw new Error("UNAUTHORIZED");
+        return db.deleteAuthorizedUser(input.id);
+      }),
+    // Get all processes data for admin view
+    getAllProcesses: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new Error("UNAUTHORIZED");
+      return db.getAllProcessesData();
+    }),
+  }),
+
+  // Check if user is authorized (public - called after OAuth login)
+  auth2: router({
+    checkAuthorization: protectedProcedure.query(async ({ ctx }) => {
+      if (!ctx.user.email) return { authorized: false, role: null };
+      const authUser = await db.getAuthorizedUserByEmail(ctx.user.email);
+      if (!authUser) return { authorized: false, role: null };
+      // Mark as enrolled if first time
+      if (!authUser.isEnrolled) {
+        await db.markUserAsEnrolled(ctx.user.email);
+        // Sync role to main users table
+        await db.updateAuthorizedUser(authUser.id, { isEnrolled: true, enrolledAt: new Date() });
+      }
+      return { authorized: true, role: authUser.role, areaName: authUser.areaName };
+    }),
+  }),
+
+  // Module observations
+  observation: router({
+    get: protectedProcedure
+      .input(z.object({ module: z.enum(["kpi", "proveedor", "cliente", "dofa", "organigrama"]) }))
+      .query(({ ctx, input }) => {
+        return db.getModuleObservation(ctx.user.id, input.module);
+      }),
+    save: protectedProcedure
+      .input(z.object({
+        module: z.enum(["kpi", "proveedor", "cliente", "dofa", "organigrama"]),
+        observations: z.string(),
+      }))
+      .mutation(({ ctx, input }) => {
+        return db.saveModuleObservation(ctx.user.id, input.module, input.observations);
+      }),
+  }),
+
   // Export data for Excel
   export: router({
     orgChart: protectedProcedure.query(({ ctx }) => {
@@ -249,6 +324,11 @@ export const appRouter = router({
     }),
     interactions: protectedProcedure.query(({ ctx }) => {
       return db.getInteractionsExportData(ctx.user.id);
+    }),
+    // Admin: export all processes consolidated
+    allProcesses: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") throw new Error("UNAUTHORIZED");
+      return db.getAllProcessesData();
     }),
   }),
 });
