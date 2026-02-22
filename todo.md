@@ -228,3 +228,20 @@
 - [x] Endpoint export.auditLog en routers.ts (solo admin)
 - [x] Hoja "Historial" en buildExcelWorkbook en excel-export.ts
 - [x] Botón "Descargar Historial" en pantalla exportar.tsx (solo admin)
+
+## Feature v13 - Correcciones y Mejoras
+
+### Bug Fix - Acceso Restringido en Historial
+- [x] Corregir bug: admin ve "Acceso restringido" en pantalla de Historial (usaba useAuth en vez de useLisRole)
+- [x] Auditoría de proyectos: adminUpdateProject ya interceptado con oldData/newData
+
+### Renombrar App y Rediseño Dashboard
+- [x] Cambiar nombre de la app a "LIS Leadership" en app.config.ts
+- [x] Mejorar header del dashboard: badge Admin rojo para admin no-superadmin, badge rojo para superadmin en modo admin
+- [x] Barra de progreso visual (X de 6 módulos completados) - ya implementada
+- [x] Tarjetas de módulos con ícono, nombre, descripción y check verde si completado - ya implementadas
+
+### Paginación en Historial
+- [x] Mostrar 50 registros por defecto en admin-historial.tsx
+- [x] Botón "Cargar más" para cargar siguientes 50 registros
+- [x] Contador de registros mostrados vs total

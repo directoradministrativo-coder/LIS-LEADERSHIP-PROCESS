@@ -147,24 +147,31 @@ export default function HomeScreen() {
               style={styles.settingsBtn}
               onPress={() => router.push("/(tabs)/admin-usuarios" as any)}
             >
-              <MaterialIcons name="manage-accounts" size={22} color="#1B4F9B" />
+              <MaterialIcons name="manage-accounts" size={20} color="#1B4F9B" />
             </TouchableOpacity>
           )}
           {/* Profile switcher for SuperAdmin */}
           {isSuperAdmin && (
             <TouchableOpacity
-              style={[styles.profileBadge, { backgroundColor: activeProfile === "admin" ? "#FEF2F2" : "#EEF2FF" }]}
+              style={[styles.profileBadge, { backgroundColor: activeProfile === "admin" ? "#CC2229" : "#EEF2FF", borderColor: activeProfile === "admin" ? "#CC2229" : "#C7D2FE" }]}
               onPress={() => router.push("/select-profile" as any)}
             >
               <MaterialIcons
                 name={activeProfile === "admin" ? "admin-panel-settings" : "person"}
-                size={14}
-                color={activeProfile === "admin" ? "#CC2229" : "#1B4F9B"}
+                size={13}
+                color={activeProfile === "admin" ? "#FFFFFF" : "#1B4F9B"}
               />
-              <Text style={[styles.profileBadgeText, { color: activeProfile === "admin" ? "#CC2229" : "#1B4F9B" }]}>
+              <Text style={[styles.profileBadgeText, { color: activeProfile === "admin" ? "#FFFFFF" : "#1B4F9B" }]}>
                 {activeProfile === "admin" ? "Admin" : "Usuario"}
               </Text>
             </TouchableOpacity>
+          )}
+          {/* Admin badge (non-superadmin admins) */}
+          {isAdmin && !isSuperAdmin && (
+            <View style={styles.adminBadge}>
+              <MaterialIcons name="admin-panel-settings" size={13} color="#FFFFFF" />
+              <Text style={styles.adminBadgeText}>Admin</Text>
+            </View>
           )}
           <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
             <Text style={styles.logoutText}>Salir</Text>
@@ -383,6 +390,20 @@ const styles = StyleSheet.create({
   profileBadgeText: {
     fontSize: 12,
     fontWeight: "700",
+  },
+  adminBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+    gap: 4,
+    backgroundColor: "#CC2229",
+  },
+  adminBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
   logoutBtn: {
     paddingHorizontal: 14,

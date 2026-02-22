@@ -28,7 +28,7 @@ const schemeFromBundleId = `manus${timestamp}`;
 
 const env = {
   // App branding - update these values directly (do not use env vars)
-  appName: "LIS Levantamiento",
+  appName: "LIS Leadership",
   appSlug: "lis-process-survey",
   // S3 URL of the app logo - set this to the URL returned by generate_image when creating custom logo
   logoUrl: "https://files.manuscdn.com/user_upload_by_module/session_file/310519663132434714/zhfOCtzCKlaCJbfJ.png",

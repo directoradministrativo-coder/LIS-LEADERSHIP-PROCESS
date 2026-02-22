@@ -13,8 +13,8 @@ import {
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/hooks/use-auth";
 import { useColors } from "@/hooks/use-colors";
+import { useLisRole } from "./_layout";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -289,9 +289,12 @@ function DetailModal({
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
+const PAGE_SIZE = 50;
+
 export default function AdminHistorialScreen() {
   const colors = useColors();
-  const { user } = useAuth();
+  const lisRole = useLisRole();
+  const isAdmin = lisRole === "admin" || lisRole === "superadmin";
 
   const [moduleFilter, setModuleFilter] = useState<ModuleFilter>("all");
   const [actionFilter, setActionFilter] = useState<ActionFilter>("all");
@@ -300,27 +303,17 @@ export default function AdminHistorialScreen() {
   const [selectedEntry, setSelectedEntry] = useState<AuditEntry | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-
-  const userRole = (user as any)?.role;
-  if (userRole !== "admin" && userRole !== "superadmin") {
-    return (
-      <ScreenContainer className="items-center justify-center p-6">
-        <Text style={{ color: "#EF4444", fontSize: 16, textAlign: "center" }}>
-          Acceso restringido. Solo administradores pueden ver el historial.
-        </Text>
-      </ScreenContainer>
-    );
-  }
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const queryInput = {
     tableName: moduleFilter !== "all" ? moduleFilter : undefined,
     action: actionFilter !== "all" ? (actionFilter as "create" | "update" | "delete") : undefined,
     processName: areaFilter !== "all" ? areaFilter : undefined,
-    limit: 150,
+    limit: 500,
   };
 
-  const { data, isLoading, refetch } = trpc.audit.list.useQuery(queryInput);
-  const { data: processNames } = trpc.audit.listProcessNames.useQuery();
+  const { data, isLoading, refetch } = trpc.audit.list.useQuery(queryInput, { enabled: isAdmin });
+  const { data: processNames } = trpc.audit.listProcessNames.useQuery(undefined, { enabled: isAdmin });
 
   const restoreMutation = trpc.audit.restore.useMutation({
     onSuccess: () => {
@@ -353,8 +346,21 @@ export default function AdminHistorialScreen() {
     setRefreshing(false);
   }, [refetch]);
 
-  const logs: AuditEntry[] = (data?.logs ?? []) as AuditEntry[];
-  const total = data?.total ?? 0;
+  // Access guard using LIS role
+  if (!isAdmin && lisRole !== null) {
+    return (
+      <ScreenContainer className="items-center justify-center p-6">
+        <Text style={{ color: "#EF4444", fontSize: 16, textAlign: "center" }}>
+          Acceso restringido. Solo administradores pueden ver el historial.
+        </Text>
+      </ScreenContainer>
+    );
+  }
+
+  const allLogs: AuditEntry[] = (data?.logs ?? []) as AuditEntry[];
+  const total = data?.total ?? allLogs.length;
+  const logs = allLogs.slice(0, visibleCount);
+  const hasMore = visibleCount < allLogs.length;
   const areas: string[] = processNames ?? [];
 
   const renderItem = ({ item }: { item: AuditEntry }) => {
@@ -513,6 +519,22 @@ export default function AdminHistorialScreen() {
           contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 40 }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1B4F9B" />
+          }
+          ListFooterComponent={
+            hasMore ? (
+              <TouchableOpacity
+                style={styles.loadMoreBtn}
+                onPress={() => setVisibleCount(c => c + PAGE_SIZE)}
+              >
+                <Text style={styles.loadMoreText}>
+                  Cargar más ({allLogs.length - visibleCount} restantes)
+                </Text>
+              </TouchableOpacity>
+            ) : allLogs.length > 0 ? (
+              <Text style={styles.endText}>
+                Mostrando {allLogs.length} de {total} registros
+              </Text>
+            ) : null
           }
         />
       )}
@@ -764,5 +786,27 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: "#22C55E",
     alignItems: "center",
+  },
+  loadMoreBtn: {
+    marginTop: 12,
+    marginBottom: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#1B4F9B",
+    alignItems: "center",
+    backgroundColor: "#1B4F9B10",
+  },
+  loadMoreText: {
+    color: "#1B4F9B",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  endText: {
+    textAlign: "center",
+    color: "#9BA1A6",
+    fontSize: 12,
+    marginTop: 12,
+    marginBottom: 8,
   },
 });
