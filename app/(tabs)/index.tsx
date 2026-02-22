@@ -6,7 +6,7 @@ import { trpc } from "@/lib/trpc";
 import { useState, useEffect } from "react";
 import { router } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Storage } from "@/lib/storage";
 
 const PROFILE_KEY = "lis_active_profile";
 
@@ -31,14 +31,14 @@ export default function HomeScreen() {
   const isAdmin = userRole === "admin" || userRole === "superadmin";
 
   useEffect(() => {
-    AsyncStorage.getItem(PROFILE_KEY).then(p => {
+    Storage.getItem(PROFILE_KEY).then((p: string | null) => {
       if (p === "admin" || p === "user") setActiveProfile(p);
     });
   }, []);
 
   const handleLogout = async () => {
     // Clear saved profile so SuperAdmin sees the selector next time
-    await AsyncStorage.removeItem(PROFILE_KEY);
+    await Storage.removeItem(PROFILE_KEY);
     logout();
   };
 

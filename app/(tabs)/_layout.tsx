@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState } from "react";
 import { MaterialIcons } from "@expo/vector-icons";
 import { trpc } from "@/lib/trpc";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Storage } from "@/lib/storage";
 
 const PROFILE_KEY = "lis_active_profile";
 
@@ -31,7 +31,7 @@ function AuthorizationGate({ children }: { children: React.ReactNode }) {
       if (checkAuth.data?.authorized) {
         // SuperAdmin: redirect to profile selector only if no profile has been chosen yet
         if (checkAuth.data.role === "superadmin") {
-          AsyncStorage.getItem(PROFILE_KEY).then(savedProfile => {
+          Storage.getItem(PROFILE_KEY).then(savedProfile => {
             if (!savedProfile) {
               // First time: go to profile selector
               router.replace("/select-profile" as any);
@@ -120,7 +120,18 @@ export default function TabLayout() {
   }
 
   if (!isAuthenticated) {
-    return null; // router.replace('/login') is handled in AuthorizationGate
+    // Show loading while redirecting to login (handled in AuthorizationGate)
+    return (
+      <View style={{ flex: 1, backgroundColor: "#FFFFFF", justifyContent: "center", alignItems: "center" }}>
+        <View style={{ flexDirection: "row", height: 6, width: "100%", position: "absolute", top: 0 }}>
+          {["#CC2229", "#F5A623", "#5CB85C", "#1B4F9B"].map(c => (
+            <View key={c} style={{ flex: 1, backgroundColor: c }} />
+          ))}
+        </View>
+        <ActivityIndicator size="large" color="#CC2229" />
+        <Text style={{ marginTop: 12, fontSize: 14, color: "#6B7280" }}>Iniciando sesión...</Text>
+      </View>
+    );
   }
 
   return (

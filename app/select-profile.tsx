@@ -5,7 +5,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { router } from "expo-router";
 import { useAuth } from "@/hooks/use-auth";
 import { MaterialIcons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Storage } from "@/lib/storage";
 
 const PROFILE_KEY = "lis_active_profile";
 
@@ -13,7 +13,7 @@ export default function SelectProfileScreen() {
   const { user } = useAuth();
 
   const selectProfile = async (profile: "user" | "admin") => {
-    await AsyncStorage.setItem(PROFILE_KEY, profile);
+    await Storage.setItem(PROFILE_KEY, profile);
     router.replace("/(tabs)" as any);
   };
 
