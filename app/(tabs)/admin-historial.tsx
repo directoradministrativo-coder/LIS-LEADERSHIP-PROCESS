@@ -5,7 +5,6 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   Modal,
   FlatList,
   RefreshControl,
@@ -350,6 +349,8 @@ export default function AdminHistorialScreen() {
   const [datePickerMode, setDatePickerMode] = useState<"from" | "to" | null>(null);
   const [tempDateInput, setTempDateInput] = useState("");
   const [dateInputError, setDateInputError] = useState("");
+  const [confirmRestoreVisible, setConfirmRestoreVisible] = useState(false);
+  const [confirmRestoreId, setConfirmRestoreId] = useState<number | null>(null);
 
   const queryInput = {
     tableName: moduleFilter !== "all" ? moduleFilter : undefined,
@@ -363,41 +364,36 @@ export default function AdminHistorialScreen() {
   const { data, isLoading, refetch } = trpc.audit.list.useQuery(queryInput, { enabled: isAdmin });
   const { data: processNames } = trpc.audit.listProcessNames.useQuery(undefined, { enabled: isAdmin });
 
+  const [restoreResultMsg, setRestoreResultMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
   const restoreMutation = trpc.audit.restore.useMutation({
     onSuccess: () => {
-      Alert.alert("Restaurado", "El registro fue restaurado exitosamente.");
       setDetailVisible(false);
+      setRestoreResultMsg({ type: "success", text: "El registro fue restaurado exitosamente." });
       refetch();
+      setTimeout(() => setRestoreResultMsg(null), 4000);
     },
     onError: (err) => {
-      Alert.alert("Error", err.message || "No se pudo restaurar el registro.");
+      setRestoreResultMsg({ type: "error", text: err.message || "No se pudo restaurar el registro." });
+      setTimeout(() => setRestoreResultMsg(null), 5000);
     },
   });
 
   const handleRestore = useCallback(
     (id: number) => {
-      const entry = selectedEntry;
-      const actionMsg = entry?.action === "delete"
-        ? "Se recrear\u00e1 el registro eliminado con los datos originales."
-        : entry?.action === "update"
-        ? "Se revertir\u00e1n los campos al estado anterior al cambio."
-        : "Se eliminar\u00e1 el registro que fue creado (deshacer creaci\u00f3n).";
-      const btnLabel = entry?.action === "delete"
-        ? "Recrear"
-        : entry?.action === "update"
-        ? "Revertir"
-        : "Deshacer";
-      Alert.alert(
-        "Confirmar restauraci\u00f3n",
-        actionMsg,
-        [
-          { text: "Cancelar", style: "cancel" },
-          { text: btnLabel, style: "destructive", onPress: () => restoreMutation.mutate({ id }) },
-        ]
-      );
+      setConfirmRestoreId(id);
+      setConfirmRestoreVisible(true);
     },
-    [restoreMutation, selectedEntry]
+    []
   );
+
+  const executeRestore = useCallback(() => {
+    if (confirmRestoreId !== null) {
+      restoreMutation.mutate({ id: confirmRestoreId });
+      setConfirmRestoreVisible(false);
+      setConfirmRestoreId(null);
+    }
+  }, [confirmRestoreId, restoreMutation]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -490,6 +486,20 @@ export default function AdminHistorialScreen() {
           </Text>
         </View>
       </View>
+
+      {/* Restore result toast */}
+      {restoreResultMsg && (
+        <View style={{
+          marginHorizontal: 16, marginTop: 8, padding: 12, borderRadius: 8,
+          backgroundColor: restoreResultMsg.type === "success" ? "#22C55E20" : "#EF444420",
+          borderLeftWidth: 3,
+          borderLeftColor: restoreResultMsg.type === "success" ? "#22C55E" : "#EF4444",
+        }}>
+          <Text style={{ color: restoreResultMsg.type === "success" ? "#22C55E" : "#EF4444", fontWeight: "600", fontSize: 13 }}>
+            {restoreResultMsg.type === "success" ? "✓ " : "✗ "}{restoreResultMsg.text}
+          </Text>
+        </View>
+      )}
 
       {/* Module filter */}
       <ScrollView
@@ -669,6 +679,53 @@ export default function AdminHistorialScreen() {
         onRestore={handleRestore}
         restoring={restoreMutation.isPending}
       />
+
+      {/* Confirm Restore Modal */}
+      <Modal
+        visible={confirmRestoreVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setConfirmRestoreVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.pickerContainer, { backgroundColor: colors.surface, padding: 24, maxWidth: 340 }]}>
+            <Text style={{ color: colors.foreground, fontSize: 18, fontWeight: "700", marginBottom: 12, textAlign: "center" }}>
+              Confirmar restauración
+            </Text>
+            <Text style={{ color: colors.muted, fontSize: 14, lineHeight: 20, textAlign: "center", marginBottom: 8 }}>
+              {selectedEntry?.action === "delete"
+                ? "Se recreará el registro eliminado con los datos originales."
+                : selectedEntry?.action === "update"
+                ? "Se revertirán los campos al estado anterior al cambio."
+                : "Se eliminará el registro que fue creado (deshacer creación)."}
+            </Text>
+            <Text style={{ color: "#F59E0B", fontSize: 12, textAlign: "center", marginBottom: 16 }}>
+              ⚠️ Esta acción no se puede deshacer fácilmente.
+            </Text>
+            <View style={{ flexDirection: "row", gap: 12 }}>
+              <TouchableOpacity
+                style={[styles.cancelBtn, { flex: 1, borderColor: colors.border }]}
+                onPress={() => { setConfirmRestoreVisible(false); setConfirmRestoreId(null); }}
+              >
+                <Text style={{ color: colors.foreground, fontWeight: "600", textAlign: "center" }}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.restoreBtn, { flex: 1 }, restoreMutation.isPending && { opacity: 0.6 }]}
+                onPress={executeRestore}
+                disabled={restoreMutation.isPending}
+              >
+                {restoreMutation.isPending ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={{ color: "#fff", fontWeight: "700", textAlign: "center" }}>
+                    {selectedEntry?.action === "delete" ? "Recrear" : selectedEntry?.action === "update" ? "Revertir" : "Deshacer"}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Date input modal */}
       <Modal

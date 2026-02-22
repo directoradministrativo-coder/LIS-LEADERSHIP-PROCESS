@@ -1262,27 +1262,61 @@ export async function restoreAuditRecord(
     const { id, ...fieldsToRestore } = oldData;
     const recordId = record.recordId;
 
+    const currentData = JSON.parse(record.newData ?? "{}");
     switch (record.tableName) {
       case "kpis":
         await db.update(kpis).set(fieldsToRestore).where(eq(kpis.id, recordId));
-        await writeAuditLog("kpis", recordId, "update", JSON.parse(record.newData ?? "{}"), fieldsToRestore,
+        await writeAuditLog("kpis", recordId, "update", currentData, fieldsToRestore,
           `Admin revirtió KPI al estado anterior desde historial`, ctx);
         break;
       case "projects":
         await db.update(projects).set({ ...fieldsToRestore, hasNotification: true, notificationMessage: "El administrador revirtió cambios en este proyecto" }).where(eq(projects.id, recordId));
-        await writeAuditLog("projects", recordId, "update", JSON.parse(record.newData ?? "{}"), fieldsToRestore,
+        await writeAuditLog("projects", recordId, "update", currentData, fieldsToRestore,
           `Admin revirtió proyecto al estado anterior desde historial`, ctx);
         break;
       case "orgCollaborators":
         await db.update(orgCollaborators).set(fieldsToRestore).where(eq(orgCollaborators.id, recordId));
-        await writeAuditLog("orgCollaborators", recordId, "update", JSON.parse(record.newData ?? "{}"), fieldsToRestore,
+        await writeAuditLog("orgCollaborators", recordId, "update", currentData, fieldsToRestore,
           `Admin revirtió colaborador al estado anterior desde historial`, ctx);
         break;
-      case "kpiValues":
+      case "orgHierarchies":
+        await db.update(orgHierarchies).set(fieldsToRestore).where(eq(orgHierarchies.id, recordId));
+        await writeAuditLog("orgHierarchies", recordId, "update", currentData, fieldsToRestore,
+          `Admin revirtió cargo/nivel al estado anterior desde historial`, ctx);
+        break;
       case "interactionTasks":
+      case "kpiValues":
         await db.update(interactionTasks).set(fieldsToRestore).where(eq(interactionTasks.id, recordId));
-        await writeAuditLog("interactionTasks", recordId, "update", JSON.parse(record.newData ?? "{}"), fieldsToRestore,
+        await writeAuditLog("interactionTasks", recordId, "update", currentData, fieldsToRestore,
           `Admin revirtió tarea al estado anterior desde historial`, ctx);
+        break;
+      case "interactionStrengths":
+        await db.update(interactionStrengths).set(fieldsToRestore).where(eq(interactionStrengths.id, recordId));
+        await writeAuditLog("interactionStrengths", recordId, "update", currentData, fieldsToRestore,
+          `Admin revirtió fortaleza/oportunidad al estado anterior desde historial`, ctx);
+        break;
+      case "collaboratorFunctions":
+        await db.update(collaboratorFunctions).set(fieldsToRestore).where(eq(collaboratorFunctions.id, recordId));
+        await writeAuditLog("collaboratorFunctions", recordId, "update", currentData, fieldsToRestore,
+          `Admin revirtió función al estado anterior desde historial`, ctx);
+        break;
+      case "dofaMatrix": {
+        // DOFA uses processId as recordId, and stores serialized JSON arrays
+        const serialized = {
+          debilidades: JSON.stringify(fieldsToRestore.debilidades ?? []),
+          oportunidades: JSON.stringify(fieldsToRestore.oportunidades ?? []),
+          fortalezas: JSON.stringify(fieldsToRestore.fortalezas ?? []),
+          amenazas: JSON.stringify(fieldsToRestore.amenazas ?? []),
+        };
+        await db.update(dofaMatrix).set(serialized).where(eq(dofaMatrix.processId, recordId));
+        await writeAuditLog("dofaMatrix", recordId, "update", currentData, fieldsToRestore,
+          `Admin revirtió matriz DOFA al estado anterior desde historial`, ctx);
+        break;
+      }
+      case "processInteractions":
+        await db.update(processInteractions).set(fieldsToRestore).where(eq(processInteractions.id, recordId));
+        await writeAuditLog("processInteractions", recordId, "update", currentData, fieldsToRestore,
+          `Admin revirtió interacción al estado anterior desde historial`, ctx);
         break;
       default:
         throw new Error(`Revert not supported for table: ${record.tableName}`);
@@ -1319,6 +1353,21 @@ export async function restoreAuditRecord(
         await db.delete(processInteractions).where(eq(processInteractions.id, recordId));
         await writeAuditLog("processInteractions", recordId, "delete", JSON.parse(record.newData ?? "{}"), null,
           `Admin eliminó interacción creada (restauración desde historial)`, ctx);
+        break;
+      case "interactionTasks":
+        await db.delete(interactionTasks).where(eq(interactionTasks.id, recordId));
+        await writeAuditLog("interactionTasks", recordId, "delete", JSON.parse(record.newData ?? "{}"), null,
+          `Admin eliminó tarea creada (restauración desde historial)`, ctx);
+        break;
+      case "interactionStrengths":
+        await db.delete(interactionStrengths).where(eq(interactionStrengths.id, recordId));
+        await writeAuditLog("interactionStrengths", recordId, "delete", JSON.parse(record.newData ?? "{}"), null,
+          `Admin eliminó fortaleza creada (restauración desde historial)`, ctx);
+        break;
+      case "collaboratorFunctions":
+        await db.delete(collaboratorFunctions).where(eq(collaboratorFunctions.id, recordId));
+        await writeAuditLog("collaboratorFunctions", recordId, "delete", JSON.parse(record.newData ?? "{}"), null,
+          `Admin eliminó función creada (restauración desde historial)`, ctx);
         break;
       default:
         throw new Error(`Undo-create not supported for table: ${record.tableName}`);

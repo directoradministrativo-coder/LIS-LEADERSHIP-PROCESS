@@ -450,3 +450,23 @@
 - [x] Banner en DOFA user (arriba del summary banner)
 - [x] Banner en Interacciones user (arriba de la descripción de sección)
 - [x] Botón para descartar todas las notificaciones del módulo (dismissAll)
+
+## Bugs v28 — Historial revertir + Interacciones admin
+
+### Bug 1: Revertir cambios en historial no funciona
+- [x] Causa raíz: Alert.alert con botones personalizados no funciona en web; restoreAuditRecord solo soportaba kpis, projects, orgCollaborators, interactionTasks
+- [x] Fix: Reemplazado Alert.alert por modal de confirmación propio con botones Cancelar/Revertir
+- [x] Fix: Ampliado restoreAuditRecord para soportar TODAS las tablas: orgHierarchies, interactionStrengths, collaboratorFunctions, dofaMatrix, processInteractions
+- [x] Fix: Ampliado undo-create para soportar interactionTasks, interactionStrengths, collaboratorFunctions
+- [x] Toast de resultado (éxito/error) en vez de Alert.alert
+
+### Bug 2: Interacciones admin — botones editar/eliminar
+- [x] Causa raíz: Alert.alert no funciona en web; solo había botón eliminar con emoji, sin funcionalidad real
+- [x] Fix: Reescrita AdminInteraccionesView completa con modales propios
+- [x] Botón editar nombre de interacción (modal con TextInput)
+- [x] Botón eliminar interacción (modal de confirmación)
+- [x] Vista expandible: al tocar interacción se muestran tareas y fortalezas con botones editar/eliminar cada una
+- [x] Modal editar tarea (actividad, documento, responsable, ANS)
+- [x] Modal editar fortaleza/oportunidad
+- [x] Modal confirmar eliminar tarea/fortaleza
+- [x] Notificaciones al usuario en cada acción admin (editar nombre, eliminar, editar/eliminar tarea/fortaleza)
