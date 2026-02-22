@@ -377,3 +377,9 @@
 - [x] Ajuste 5: Bug Fix Login — app queda atascada en "Iniciando sesión..." sin redirigir; agregar timeout/fallback de 3s
 - [x] Ajuste 8: Interacciones — editar interacción completa (proceso proveedor/cliente, tipo interacción)
 - [x] Ajuste 9: Inicio y Progreso se actualizan en tiempo real (refetchInterval o invalidateQueries al completar módulos)
+
+## Bug Fix v22
+
+- [x] Bug 1: Historial no registra cambios de los nuevos endpoints de editar (organigrama, interacciones, interacción principal)
+- [x] Bug 2: Proyectos — error "No values to set" al actualizar (Drizzle falla con campos undefined en SET)
+- [x] Bug 3: Organigrama admin (Vista Org.) — falta botón mostrar/ocultar funciones de colaboradores

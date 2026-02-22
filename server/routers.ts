@@ -40,8 +40,8 @@ export const appRouter = router({
       }),
     update: protectedProcedure
       .input(z.object({ id: z.number(), name: z.string().min(1).max(100), level: z.number().optional() }))
-      .mutation(({ input }) => {
-        return db.updateHierarchy(input.id, { name: input.name, level: input.level });
+      .mutation(({ ctx, input }) => {
+        return db.updateHierarchy(input.id, { name: input.name, level: input.level }, { userId: ctx.user.id, userName: ctx.user.name ?? undefined, userEmail: ctx.user.email ?? undefined });
       }),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
@@ -86,8 +86,8 @@ export const appRouter = router({
       }),
     update: protectedProcedure
       .input(z.object({ id: z.number(), description: z.string().min(1) }))
-      .mutation(({ input }) => {
-        return db.updateCollaboratorFunction(input.id, input.description);
+      .mutation(({ ctx, input }) => {
+        return db.updateCollaboratorFunction(input.id, input.description, { userId: ctx.user.id, userName: ctx.user.name ?? undefined, userEmail: ctx.user.email ?? undefined });
       }),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
@@ -95,7 +95,6 @@ export const appRouter = router({
         return db.deleteCollaboratorFunction(input.id);
       }),
   }),
-
   // KPIs
   kpi: router({
     list: protectedProcedure.query(({ ctx }) => {
@@ -175,8 +174,8 @@ export const appRouter = router({
         relatedProcessName: z.string().min(1).max(255),
         isCustomProcess: z.boolean().optional(),
       }))
-      .mutation(({ input }) => {
-        return db.updateInteraction(input.id, { relatedProcessName: input.relatedProcessName, isCustomProcess: input.isCustomProcess });
+      .mutation(({ ctx, input }) => {
+        return db.updateInteraction(input.id, { relatedProcessName: input.relatedProcessName, isCustomProcess: input.isCustomProcess }, { userId: ctx.user.id, userName: ctx.user.name ?? undefined, userEmail: ctx.user.email ?? undefined });
       }),
   }),
 
@@ -240,8 +239,8 @@ export const appRouter = router({
       }),
     update: protectedProcedure
       .input(z.object({ id: z.number(), description: z.string().min(1) }))
-      .mutation(({ input }) => {
-        return db.updateInteractionStrength(input.id, input.description);
+      .mutation(({ ctx, input }) => {
+        return db.updateInteractionStrength(input.id, input.description, { userId: ctx.user.id, userName: ctx.user.name ?? undefined, userEmail: ctx.user.email ?? undefined });
       }),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
@@ -396,8 +395,7 @@ export const appRouter = router({
         description: z.string().min(1),
         impact: z.number().min(1).max(5),
         difficulty: z.number().min(1).max(5),
-      }))
-      .mutation(({ ctx, input }) => {
+      }))      .mutation(async ({ ctx, input }) => {
         return db.createProject(ctx.user.id, input);
       }),
     update: protectedProcedure
@@ -408,26 +406,31 @@ export const appRouter = router({
         impact: z.number().min(1).max(5).optional(),
         difficulty: z.number().min(1).max(5).optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
         const updateData: Parameters<typeof db.updateProject>[1] = {};
-        if (input.name) updateData.name = input.name;
-        if (input.description) updateData.description = input.description;
-        if (input.impact !== undefined) {
-          updateData.impact = input.impact;
+        if (input.name !== undefined) updateData.name = input.name;
+        if (input.description !== undefined) updateData.description = input.description;
+        if (input.impact !== undefined) updateData.impact = input.impact;
+        if (input.difficulty !== undefined) updateData.difficulty = input.difficulty;
+
+        // Only update if there are fields to set
+        if (Object.keys(updateData).length > 0) {
+          await db.updateProject(input.id, updateData, {
+            userId: ctx.user.id,
+            userName: ctx.user.name ?? undefined,
+            userEmail: ctx.user.email ?? undefined,
+          });
         }
-        if (input.difficulty !== undefined) {
-          updateData.difficulty = input.difficulty;
-        }
+
         // Recalculate subtotal if impact or difficulty changed
         if (input.impact !== undefined || input.difficulty !== undefined) {
-          const current = await db.updateProject(input.id, updateData);
+          const current = await db.getProjectById(input.id);
           if (current) {
             await db.updateProject(input.id, { subtotal: current.impact * current.difficulty });
           }
-        } else {
-          await db.updateProject(input.id, updateData);
         }
-        return db.updateProject(input.id, {});
+
+        return db.getProjectById(input.id);
       }),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))

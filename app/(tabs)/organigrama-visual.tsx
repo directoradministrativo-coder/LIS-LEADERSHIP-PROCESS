@@ -154,8 +154,10 @@ function AdminOrgView() {
 
   // Build integrated view: group all hierarchies by level across filtered processes
   const byLevel = useMemo(() => {
-    const map: Record<number, { processName: string; areaName: string; hierarchy: any; collaborators: any[] }[]> = {};
-    for (const { process, hierarchies, collaborators } of filteredData) {
+    const map: Record<number, { processName: string; areaName: string; hierarchy: any; collaborators: any[]; functions: CollabFunction[] }[]> = {};
+    for (const item of filteredData) {
+      const { process, hierarchies, collaborators } = item as any;
+      const processFunctions: CollabFunction[] = (item as any).functions ?? [];
       for (const h of hierarchies) {
         if (!map[h.level]) map[h.level] = [];
         map[h.level].push({
@@ -163,6 +165,7 @@ function AdminOrgView() {
           areaName: process.areaName ?? "",
           hierarchy: h,
           collaborators,
+          functions: processFunctions,
         });
       }
     }
@@ -229,9 +232,11 @@ function AdminOrgView() {
 
       {viewMode === "separado" ? (
         <ScrollView style={styles.adminScrollView} showsVerticalScrollIndicator={false}>
-          {filteredData.map(({ process, user, hierarchies, collaborators }: any) => {
+          {filteredData.map((item: any) => {
+            const { process, user, hierarchies, collaborators } = item;
+            const processFunctions: CollabFunction[] = item.functions ?? [];
             if (!process.processName || hierarchies.length === 0) return null;
-            const sortedHierarchies = [...hierarchies].sort((a, b) => a.level - b.level);
+            const sortedHierarchies = [...hierarchies].sort((a: any, b: any) => a.level - b.level);
             return (
               <View key={process.id} style={styles.processBlock}>
                 <View style={styles.processBlockHeader}>
@@ -249,12 +254,12 @@ function AdminOrgView() {
                   </View>
                 </View>
                 <View style={styles.processBlockContent}>
-                  {sortedHierarchies.map(h => (
+                  {sortedHierarchies.map((h: any) => (
                     <OrgNode
                       key={h.id}
                       hierarchy={h}
                       collaborators={collaborators as Collaborator[]}
-                      allFunctions={[]}
+                      allFunctions={processFunctions}
                       depth={h.level}
                     />
                   ))}
@@ -287,7 +292,7 @@ function AdminOrgView() {
                     <OrgNode
                       hierarchy={item.hierarchy}
                       collaborators={item.collaborators as Collaborator[]}
-                      allFunctions={[]}
+                      allFunctions={item.functions ?? []}
                       depth={0}
                     />
                   </View>

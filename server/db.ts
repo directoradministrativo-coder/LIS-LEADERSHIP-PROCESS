@@ -266,10 +266,15 @@ export async function createHierarchy(userId: number, data: { name: string; leve
   return created[0];
 }
 
-export async function updateHierarchy(id: number, data: { name?: string; level?: number }) {
+export async function updateHierarchy(id: number, data: { name?: string; level?: number }, ctx: AuditContext = {}) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  const snap = await db.select().from(orgHierarchies).where(eq(orgHierarchies.id, id)).limit(1);
   await db.update(orgHierarchies).set(data).where(eq(orgHierarchies.id, id));
+  if (snap.length > 0) {
+    await writeAuditLog("orgHierarchies", id, "update", snap[0], { ...snap[0], ...data },
+      `Modificó cargo/nivel "${snap[0].name}"`, ctx);
+  }
 }
 
 export async function deleteHierarchy(id: number, ctx: { userId?: number; userName?: string; userEmail?: string; processId?: number; processName?: string } = {}) {
@@ -367,10 +372,15 @@ export async function createCollaboratorFunction(data: { collaboratorId: number;
   await db.insert(collaboratorFunctions).values({ ...data, order: data.order ?? 0 });
 }
 
-export async function updateCollaboratorFunction(id: number, description: string) {
+export async function updateCollaboratorFunction(id: number, description: string, ctx: AuditContext = {}) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  const snap = await db.select().from(collaboratorFunctions).where(eq(collaboratorFunctions.id, id)).limit(1);
   await db.update(collaboratorFunctions).set({ description }).where(eq(collaboratorFunctions.id, id));
+  if (snap.length > 0) {
+    await writeAuditLog("collaboratorFunctions", id, "update", snap[0], { ...snap[0], description },
+      `Modificó función de colaborador`, ctx);
+  }
 }
 
 export async function deleteCollaboratorFunction(id: number) {
@@ -514,14 +524,19 @@ export async function deleteInteraction(id: number, ctx: { userId?: number; user
   }
 }
 
-export async function updateInteraction(id: number, data: { relatedProcessName: string; isCustomProcess?: boolean }) {
+export async function updateInteraction(id: number, data: { relatedProcessName: string; isCustomProcess?: boolean }, ctx: AuditContext = {}) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  const snap = await db.select().from(processInteractions).where(eq(processInteractions.id, id)).limit(1);
   await db.update(processInteractions).set({
     relatedProcessName: data.relatedProcessName,
     isCustomProcess: data.isCustomProcess ?? false,
     updatedAt: new Date(),
   }).where(eq(processInteractions.id, id));
+  if (snap.length > 0) {
+    await writeAuditLog("processInteractions", id, "update", snap[0], { ...snap[0], ...data },
+      `Modificó interacción con "${snap[0].relatedProcessName}" → "${data.relatedProcessName}"`, ctx);
+  }
 }
 
 // ============================================================
@@ -590,10 +605,15 @@ export async function createInteractionStrength(data: { interactionId: number; t
   await db.insert(interactionStrengths).values(data);
 }
 
-export async function updateInteractionStrength(id: number, description: string) {
+export async function updateInteractionStrength(id: number, description: string, ctx: AuditContext = {}) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  const snap = await db.select().from(interactionStrengths).where(eq(interactionStrengths.id, id)).limit(1);
   await db.update(interactionStrengths).set({ description }).where(eq(interactionStrengths.id, id));
+  if (snap.length > 0) {
+    await writeAuditLog("interactionStrengths", id, "update", snap[0], { ...snap[0], description },
+      `Modificó fortaleza/oportunidad en interacciones`, ctx);
+  }
 }
 
 export async function deleteInteractionStrength(id: number) {
@@ -758,16 +778,22 @@ export async function getAllProcessesData() {
   for (const process of allProcesses) {
     const user = await db.select().from(users).where(eq(users.id, process.userId)).limit(1);
     const hierarchies = await db.select().from(orgHierarchies).where(eq(orgHierarchies.processId, process.id));
-    const collaborators = await db.select().from(orgCollaborators).where(eq(orgCollaborators.processId, process.id));
+     const collaborators = await db.select().from(orgCollaborators).where(eq(orgCollaborators.processId, process.id));
+    // Load functions for each collaborator
+    const allFunctions: any[] = [];
+    for (const collab of collaborators) {
+      const funcs = await db.select().from(collaboratorFunctions).where(eq(collaboratorFunctions.collaboratorId, collab.id));
+      allFunctions.push(...funcs);
+    }
     const kpiList = await db.select().from(kpis).where(eq(kpis.processId, process.id));
     const dofaRow = await db.select().from(dofaMatrix).where(eq(dofaMatrix.processId, process.id)).limit(1);
     const interactions = await db.select().from(processInteractions).where(eq(processInteractions.processId, process.id));
-
     result.push({
       process,
       user: user[0] ?? null,
       hierarchies,
       collaborators,
+      functions: allFunctions,
       kpis: kpiList,
       dofa: dofaRow.length > 0 ? {
         ...dofaRow[0],
@@ -878,6 +904,13 @@ export async function createProject(userId: number, data: {
   return created[0];
 }
 
+export async function getProjectById(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(projects).where(eq(projects.id, id)).limit(1);
+  return result[0] ?? null;
+}
+
 export async function updateProject(id: number, data: Partial<{
   name: string;
   description: string;
@@ -889,10 +922,19 @@ export async function updateProject(id: number, data: Partial<{
   hasNotification: boolean;
   notificationMessage: string | null;
   adminModifiedAt: Date | null;
-}>) {
+}>, ctx: AuditContext = {}) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.update(projects).set(data).where(eq(projects.id, id));
+  // Only run update if there are fields to set
+  if (Object.keys(data).length > 0) {
+    const snap = await db.select().from(projects).where(eq(projects.id, id)).limit(1);
+    await db.update(projects).set(data).where(eq(projects.id, id));
+    if (snap.length > 0 && ctx.userId) {
+      const proj = snap[0];
+      await writeAuditLog("projects", id, "update", proj, { ...proj, ...data },
+        `Modificó proyecto "${proj.name}"`, ctx);
+    }
+  }
   const updated = await db.select().from(projects).where(eq(projects.id, id)).limit(1);
   return updated[0];
 }
