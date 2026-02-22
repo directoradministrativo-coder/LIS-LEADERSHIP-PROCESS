@@ -83,7 +83,12 @@ function ModuleDots({ entry }: { entry: ProgressEntry }) {
 }
 
 function UserProgressView() {
-  const { data: myProgress, isLoading } = trpc.progress.myProgress.useQuery();
+  const { data: myProgress, isLoading } = trpc.progress.myProgress.useQuery(undefined, {
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    refetchInterval: 30000,
+    staleTime: 0,
+  });
   const modules = ["organigrama", "kpis", "dofa", "proveedores", "clientes", "proyectos"] as const;
 
   if (isLoading) {
@@ -155,7 +160,13 @@ export default function AdminProgresoScreen() {
 
   const { data: progressList = [], isLoading, refetch } = trpc.admin.getConsolidatedProgress.useQuery(
     undefined,
-    { enabled: isAdmin }
+    {
+      enabled: isAdmin,
+      refetchOnMount: true,
+      refetchOnWindowFocus: true,
+      refetchInterval: 30000,
+      staleTime: 0,
+    }
   );
   const { data: deadlineData, refetch: refetchDeadline } = trpc.config.getDeadline.useQuery();
 

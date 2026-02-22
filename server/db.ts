@@ -514,6 +514,16 @@ export async function deleteInteraction(id: number, ctx: { userId?: number; user
   }
 }
 
+export async function updateInteraction(id: number, data: { relatedProcessName: string; isCustomProcess?: boolean }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(processInteractions).set({
+    relatedProcessName: data.relatedProcessName,
+    isCustomProcess: data.isCustomProcess ?? false,
+    updatedAt: new Date(),
+  }).where(eq(processInteractions.id, id));
+}
+
 // ============================================================
 // INTERACTION TASKS
 // ============================================================

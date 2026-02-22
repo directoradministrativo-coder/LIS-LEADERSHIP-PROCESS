@@ -92,6 +92,9 @@ export default function HomeScreen() {
   const progressQuery = trpc.progress.get.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    refetchInterval: 30000,
+    staleTime: 0,
   });
 
   const progress = progressQuery.data;

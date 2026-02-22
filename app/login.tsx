@@ -2,7 +2,7 @@ import { View, Text, Image, TouchableOpacity, ActivityIndicator, StyleSheet, Scr
 import { useAuth } from "@/hooks/use-auth";
 import { useColors } from "@/hooks/use-colors";
 import { router } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { startOAuthLogin } from "@/constants/oauth";
 
@@ -10,13 +10,21 @@ export default function LoginScreen() {
   const { isAuthenticated, loading } = useAuth();
   const colors = useColors();
 
+  // Safety timeout: if loading takes more than 3 seconds, show the login screen anyway
+  // This prevents the app from getting stuck on the spinner when there is no session
+  const [timedOut, setTimedOut] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setTimedOut(true), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
   useEffect(() => {
     if (!loading && isAuthenticated) {
       router.replace("/(tabs)");
     }
   }, [isAuthenticated, loading]);
 
-  if (loading) {
+  if (loading && !timedOut) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color="#CC2229" />

@@ -204,6 +204,10 @@ export default function InteraccionesScreen() {
   const [editingStrengthId, setEditingStrengthId] = useState<number | null>(null);
   const [editStrengthType, setEditStrengthType] = useState<"fortaleza" | "oportunidad">("fortaleza");
   const [editStrengthText, setEditStrengthText] = useState("");
+  // Edit interaction (process name) state
+  const [showEditInteractionModal, setShowEditInteractionModal] = useState(false);
+  const [editingInteractionId, setEditingInteractionId] = useState<number | null>(null);
+  const [editInteractionName, setEditInteractionName] = useState("");
 
   const interactionsQuery = trpc.interaction.list.useQuery({ type: activeType });
 
@@ -247,6 +251,10 @@ export default function InteraccionesScreen() {
 
   const updateStrength = trpc.interactionStrength.update.useMutation({
     onSuccess: () => { strengthsQuery.refetch(); setShowEditStrengthModal(false); setEditingStrengthId(null); setEditStrengthText(""); },
+  });
+
+  const updateInteraction = trpc.interaction.update.useMutation({
+    onSuccess: () => { interactionsQuery.refetch(); setShowEditInteractionModal(false); setEditingInteractionId(null); setEditInteractionName(""); },
   });
 
   const interactions = interactionsQuery.data ?? [];
@@ -353,6 +361,17 @@ export default function InteraccionesScreen() {
     updateStrength.mutate({ id: editingStrengthId, description: editStrengthText.trim() });
   };
 
+  const handleOpenEditInteraction = (interaction: { id: number; relatedProcessName: string; isCustomProcess: boolean }) => {
+    setEditingInteractionId(interaction.id);
+    setEditInteractionName(interaction.relatedProcessName);
+    setShowEditInteractionModal(true);
+  };
+
+  const handleSaveEditInteraction = () => {
+    if (!editInteractionName.trim() || !editingInteractionId) return;
+    updateInteraction.mutate({ id: editingInteractionId, relatedProcessName: editInteractionName.trim() });
+  };
+
   const typeConfig = {
     proveedor: { label: "Proveedores", icon: "📦", color: "#F5A623", bgColor: "#FFFBEB", description: "Procesos que proveen entradas a este proceso" },
     cliente: { label: "Clientes", icon: "🤝", color: "#6366F1", bgColor: "#EEF2FF", description: "Procesos que reciben salidas de este proceso" },
@@ -433,6 +452,12 @@ export default function InteraccionesScreen() {
                       <View style={[styles.interactionDot, { backgroundColor: config.color }]} />
                       <Text style={styles.interactionName}>{interaction.relatedProcessName}</Text>
                       <View style={styles.interactionActions}>
+                        <TouchableOpacity
+                          onPress={() => handleOpenEditInteraction(interaction)}
+                          style={{ marginRight: 4 }}
+                        >
+                          <MaterialIcons name="edit" size={18} color="#6B7280" />
+                        </TouchableOpacity>
                         <TouchableOpacity
                           onPress={() => Alert.alert("Eliminar", `¿Eliminar "${interaction.relatedProcessName}"?`, [
                             { text: "Cancelar", style: "cancel" },
@@ -745,11 +770,39 @@ export default function InteraccionesScreen() {
             </TouchableOpacity>
           </View>
         </View>
+       </KeyboardModal>
+
+      {/* Edit Interaction Modal */}
+      <KeyboardModal
+        visible={showEditInteractionModal}
+        onClose={() => { setShowEditInteractionModal(false); setEditingInteractionId(null); setEditInteractionName(""); }}
+        title="Editar Proceso"
+      >
+        <View style={styles.modalPadding}>
+          <Text style={styles.inputLabel}>Nombre del Proceso</Text>
+          <TextInput
+            style={styles.input}
+            value={editInteractionName}
+            onChangeText={setEditInteractionName}
+            placeholder="Nombre del proceso..."
+            placeholderTextColor="#9CA3AF"
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={handleSaveEditInteraction}
+          />
+          <View style={styles.modalActions}>
+            <TouchableOpacity style={styles.cancelModalBtn} onPress={() => { setShowEditInteractionModal(false); setEditingInteractionId(null); setEditInteractionName(""); }}>
+              <Text style={styles.cancelModalText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.saveModalBtn} onPress={handleSaveEditInteraction} disabled={updateInteraction.isPending}>
+              {updateInteraction.isPending ? <ActivityIndicator size="small" color="#FFF" /> : <Text style={styles.saveModalText}>Guardar</Text>}
+            </TouchableOpacity>
+          </View>
+        </View>
       </KeyboardModal>
     </ScreenContainer>
   );
 }
-
 const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: "#E5E7EB", backgroundColor: "#FFFFFF" },
   headerTitle: { fontSize: 18, fontWeight: "800", color: "#1A1A2E" },

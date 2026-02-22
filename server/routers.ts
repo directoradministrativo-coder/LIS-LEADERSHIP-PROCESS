@@ -169,6 +169,15 @@ export const appRouter = router({
       .mutation(({ ctx, input }) => {
         return db.deleteInteraction(input.id, { userId: ctx.user.id, userName: ctx.user.name ?? undefined, userEmail: ctx.user.email ?? undefined });
       }),
+    update: protectedProcedure
+      .input(z.object({
+        id: z.number(),
+        relatedProcessName: z.string().min(1).max(255),
+        isCustomProcess: z.boolean().optional(),
+      }))
+      .mutation(({ input }) => {
+        return db.updateInteraction(input.id, { relatedProcessName: input.relatedProcessName, isCustomProcess: input.isCustomProcess });
+      }),
   }),
 
   // Interaction Tasks

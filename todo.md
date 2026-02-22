@@ -371,3 +371,9 @@
 - [x] Ajuste 6: Organigrama admin — filtro por proceso funcional
 - [x] Ajuste 10: Exportar reporte — procesos aparecen como "Sin nombre" en modo Todos y Seleccionar
 - [x] Ajuste 11: Vista Organigrama admin (superadmin) no muestra organigramas de otros procesos (aparece "Sin procesos registrados")
+
+## Ajustes pendientes v21
+
+- [x] Ajuste 5: Bug Fix Login — app queda atascada en "Iniciando sesión..." sin redirigir; agregar timeout/fallback de 3s
+- [x] Ajuste 8: Interacciones — editar interacción completa (proceso proveedor/cliente, tipo interacción)
+- [x] Ajuste 9: Inicio y Progreso se actualizan en tiempo real (refetchInterval o invalidateQueries al completar módulos)
