@@ -256,6 +256,14 @@ export default function TabLayout() {
               href: isAdmin ? undefined : null,
             }}
           />
+          <Tabs.Screen
+            name="admin-historial"
+            options={{
+              title: "Historial",
+              tabBarIcon: ({ color, size }) => <MaterialIcons name="history" size={size} color={color} />,
+              href: isAdmin ? undefined : null,
+            }}
+          />
         </Tabs>
       </AuthorizationGate>
     </LisRoleContext.Provider>

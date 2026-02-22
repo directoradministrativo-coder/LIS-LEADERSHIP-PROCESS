@@ -45,8 +45,8 @@ export const appRouter = router({
       }),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(({ input }) => {
-        return db.deleteHierarchy(input.id);
+      .mutation(({ ctx, input }) => {
+        return db.deleteHierarchy(input.id, { userId: ctx.user.id, userName: ctx.user.name ?? undefined, userEmail: ctx.user.email ?? undefined });
       }),
   }),
 
@@ -67,8 +67,8 @@ export const appRouter = router({
       }),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(({ input }) => {
-        return db.deleteCollaborator(input.id);
+      .mutation(({ ctx, input }) => {
+        return db.deleteCollaborator(input.id, { userId: ctx.user.id, userName: ctx.user.name ?? undefined, userEmail: ctx.user.email ?? undefined });
       }),
   }),
 
@@ -126,8 +126,8 @@ export const appRouter = router({
       }),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(({ input }) => {
-        return db.deleteKPI(input.id);
+      .mutation(({ ctx, input }) => {
+        return db.deleteKPI(input.id, { userId: ctx.user.id, userName: ctx.user.name ?? undefined, userEmail: ctx.user.email ?? undefined });
       }),
   }),
 
@@ -166,8 +166,8 @@ export const appRouter = router({
       }),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(({ input }) => {
-        return db.deleteInteraction(input.id);
+      .mutation(({ ctx, input }) => {
+        return db.deleteInteraction(input.id, { userId: ctx.user.id, userName: ctx.user.name ?? undefined, userEmail: ctx.user.email ?? undefined });
       }),
   }),
 
@@ -393,8 +393,8 @@ export const appRouter = router({
       }),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(({ input }) => {
-        return db.deleteProject(input.id);
+      .mutation(({ ctx, input }) => {
+        return db.deleteProject(input.id, { userId: ctx.user.id, userName: ctx.user.name ?? undefined, userEmail: ctx.user.email ?? undefined });
       }),
     dismissNotification: protectedProcedure
       .input(z.object({ id: z.number() }))
@@ -415,6 +415,28 @@ export const appRouter = router({
         if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
         await db.setConfig("deadline", input.deadline);
         return { success: true };
+      }),
+  }),
+
+  // Admin: Audit Log
+  audit: router({
+    list: protectedProcedure
+      .input(z.object({
+        tableName: z.string().optional(),
+        action: z.enum(["create", "update", "delete"]).optional(),
+        processId: z.number().optional(),
+        limit: z.number().optional(),
+        offset: z.number().optional(),
+      }))
+      .query(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
+        return db.getAuditLogs(input);
+      }),
+    restore: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
+        return db.restoreAuditRecord(input.id, { userId: ctx.user.id, userName: ctx.user.name ?? undefined, userEmail: ctx.user.email ?? undefined });
       }),
   }),
 

@@ -57,6 +57,13 @@
       "when": 1771727468048,
       "tag": "0007_dusty_imperial_guard",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1771729175084,
+      "tag": "0008_dusty_firestar",
+      "breakpoints": true
     }
   ]
 }

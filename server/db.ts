@@ -105,8 +105,89 @@ import {
   moduleObservations,
   projects,
   appConfig,
+  auditLog,
 } from "../drizzle/schema";
-import { and, ne, desc } from "drizzle-orm";
+import { and, ne, desc, sql } from "drizzle-orm";
+
+// ============================================================
+// AUDIT LOG HELPERS
+// ============================================================
+
+interface AuditContext {
+  userId?: number;
+  userName?: string;
+  userEmail?: string;
+  processId?: number;
+  processName?: string;
+}
+
+export async function writeAuditLog(
+  tableName: string,
+  recordId: number,
+  action: "create" | "update" | "delete",
+  oldData: any,
+  newData: any,
+  description: string,
+  ctx: AuditContext = {}
+) {
+  const db = await getDb();
+  if (!db) return;
+  try {
+    await db.insert(auditLog).values({
+      tableName,
+      recordId,
+      action,
+      oldData: oldData ? JSON.stringify(oldData) : null,
+      newData: newData ? JSON.stringify(newData) : null,
+      userId: ctx.userId ?? null,
+      userName: ctx.userName ?? null,
+      userEmail: ctx.userEmail ?? null,
+      processId: ctx.processId ?? null,
+      processName: ctx.processName ?? null,
+      description,
+      isRestored: false,
+    });
+  } catch (e) {
+    // Audit failures must never break the main operation
+    console.warn("[Audit] Failed to write audit log:", e);
+  }
+}
+
+export async function getAuditLogs(filters: {
+  tableName?: string;
+  action?: "create" | "update" | "delete";
+  processId?: number;
+  limit?: number;
+  offset?: number;
+}) {
+  const db = await getDb();
+  if (!db) return { logs: [], total: 0 };
+
+  const conditions: any[] = [];
+  if (filters.tableName) conditions.push(eq(auditLog.tableName, filters.tableName));
+  if (filters.action) conditions.push(eq(auditLog.action, filters.action));
+  if (filters.processId) conditions.push(eq(auditLog.processId, filters.processId));
+
+  const limit = filters.limit ?? 50;
+  const offset = filters.offset ?? 0;
+
+  const query = db.select().from(auditLog);
+  const withWhere = conditions.length > 0 ? query.where(and(...conditions)) : query;
+  const logs = await withWhere.orderBy(desc(auditLog.createdAt)).limit(limit).offset(offset);
+
+  const countQuery = db.select({ count: sql<number>`count(*)` }).from(auditLog);
+  const withWhereCount = conditions.length > 0 ? countQuery.where(and(...conditions)) : countQuery;
+  const countResult = await withWhereCount;
+  const total = Number(countResult[0]?.count ?? 0);
+
+  return { logs, total };
+}
+
+export async function markAuditRestored(id: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(auditLog).set({ isRestored: true }).where(eq(auditLog.id, id));
+}
 
 // ============================================================
 // PROCESSES
@@ -170,16 +251,33 @@ export async function updateHierarchy(id: number, data: { name?: string; level?:
   await db.update(orgHierarchies).set(data).where(eq(orgHierarchies.id, id));
 }
 
-export async function deleteHierarchy(id: number) {
+export async function deleteHierarchy(id: number, ctx: { userId?: number; userName?: string; userEmail?: string; processId?: number; processName?: string } = {}) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
+  // Snapshot before delete for audit
+  const hierarchySnap = await db.select().from(orgHierarchies).where(eq(orgHierarchies.id, id)).limit(1);
   const collabs = await db.select().from(orgCollaborators).where(eq(orgCollaborators.hierarchyId, id));
+  const allFunctions: any[] = [];
   for (const collab of collabs) {
+    const funcs = await db.select().from(collaboratorFunctions).where(eq(collaboratorFunctions.collaboratorId, collab.id));
+    allFunctions.push(...funcs);
     await db.delete(collaboratorFunctions).where(eq(collaboratorFunctions.collaboratorId, collab.id));
   }
   await db.delete(orgCollaborators).where(eq(orgCollaborators.hierarchyId, id));
   await db.delete(orgHierarchies).where(eq(orgHierarchies.id, id));
+
+  // Write audit log after delete
+  if (hierarchySnap.length > 0) {
+    const snap = hierarchySnap[0];
+    await writeAuditLog(
+      "orgHierarchies", id, "delete",
+      { hierarchy: snap, collaborators: collabs, functions: allFunctions },
+      null,
+      `Eliminó cargo/nivel "${snap.name}" del organigrama con ${collabs.length} colaborador(es)`,
+      ctx
+    );
+  }
 }
 
 // ============================================================
@@ -214,11 +312,17 @@ export async function updateCollaborator(id: number, data: { name?: string; posi
   await db.update(orgCollaborators).set(data).where(eq(orgCollaborators.id, id));
 }
 
-export async function deleteCollaborator(id: number) {
+export async function deleteCollaborator(id: number, ctx: { userId?: number; userName?: string; userEmail?: string; processId?: number; processName?: string } = {}) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  const snap = await db.select().from(orgCollaborators).where(eq(orgCollaborators.id, id)).limit(1);
+  const funcs = await db.select().from(collaboratorFunctions).where(eq(collaboratorFunctions.collaboratorId, id));
   await db.delete(collaboratorFunctions).where(eq(collaboratorFunctions.collaboratorId, id));
   await db.delete(orgCollaborators).where(eq(orgCollaborators.id, id));
+  if (snap.length > 0) {
+    await writeAuditLog("orgCollaborators", id, "delete", { collaborator: snap[0], functions: funcs }, null,
+      `Eliminó colaborador "${snap[0].name}" del organigrama`, ctx);
+  }
 }
 
 // ============================================================
@@ -281,10 +385,15 @@ export async function updateKPI(id: number, data: Partial<{ name: string; object
   await db.update(kpis).set(data).where(eq(kpis.id, id));
 }
 
-export async function deleteKPI(id: number) {
+export async function deleteKPI(id: number, ctx: { userId?: number; userName?: string; userEmail?: string; processId?: number; processName?: string } = {}) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  const snap = await db.select().from(kpis).where(eq(kpis.id, id)).limit(1);
   await db.delete(kpis).where(eq(kpis.id, id));
+  if (snap.length > 0) {
+    await writeAuditLog("kpis", id, "delete", snap[0], null,
+      `Eliminó KPI "${snap[0].name}"`, ctx);
+  }
 }
 
 // ============================================================
@@ -358,12 +467,20 @@ export async function createInteraction(userId: number, data: { type: "proveedor
   return created[0];
 }
 
-export async function deleteInteraction(id: number) {
+export async function deleteInteraction(id: number, ctx: { userId?: number; userName?: string; userEmail?: string; processId?: number; processName?: string } = {}) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  const snap = await db.select().from(processInteractions).where(eq(processInteractions.id, id)).limit(1);
+  const tasks = await db.select().from(interactionTasks).where(eq(interactionTasks.interactionId, id));
+  const strengths = await db.select().from(interactionStrengths).where(eq(interactionStrengths.interactionId, id));
   await db.delete(interactionStrengths).where(eq(interactionStrengths.interactionId, id));
   await db.delete(interactionTasks).where(eq(interactionTasks.interactionId, id));
   await db.delete(processInteractions).where(eq(processInteractions.id, id));
+  if (snap.length > 0) {
+    await writeAuditLog("processInteractions", id, "delete",
+      { interaction: snap[0], tasks, strengths }, null,
+      `Eliminó interacción con "${snap[0].relatedProcessName}" (${snap[0].type})`, ctx);
+  }
 }
 
 // ============================================================
@@ -728,10 +845,15 @@ export async function updateProject(id: number, data: Partial<{
   return updated[0];
 }
 
-export async function deleteProject(id: number) {
+export async function deleteProject(id: number, ctx: { userId?: number; userName?: string; userEmail?: string; processId?: number; processName?: string } = {}) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  const snap = await db.select().from(projects).where(eq(projects.id, id)).limit(1);
   await db.delete(projects).where(eq(projects.id, id));
+  if (snap.length > 0) {
+    await writeAuditLog("projects", id, "delete", snap[0], null,
+      `Eliminó proyecto "${snap[0].name}"`, ctx);
+  }
 }
 
 export async function dismissProjectNotification(id: number) {
@@ -945,4 +1067,110 @@ export async function getProjectsExportData(userId: number) {
     .where(eq(projects.processId, process[0].id))
     .orderBy(desc(projects.subtotal));
   return { process: process[0], projects: projectList };
+}
+
+// ─── Restore from Audit Log ───────────────────────────────────────────────────
+
+export async function restoreAuditRecord(
+  auditId: number,
+  ctx: { userId?: number; userName?: string; userEmail?: string } = {}
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Fetch the audit log entry
+  const entry = await db.select().from(auditLog).where(eq(auditLog.id, auditId)).limit(1);
+  if (entry.length === 0) throw new Error("Audit record not found");
+
+  const record = entry[0];
+  if (record.action !== "delete") throw new Error("Only deleted records can be restored");
+  if (!record.oldData) throw new Error("No snapshot data available for restoration");
+
+  const oldData = JSON.parse(record.oldData);
+
+  // Restore based on tableName
+  switch (record.tableName) {
+    case "kpis": {
+      const { id, ...rest } = oldData;
+      await db.insert(kpis).values(rest);
+      await writeAuditLog("kpis", record.recordId, "create", null, rest,
+        `Admin restauró KPI "${rest.name}" desde historial`, ctx);
+      break;
+    }
+    case "projects": {
+      const { id, ...rest } = oldData;
+      await db.insert(projects).values({ ...rest, status: rest.status ?? "por_priorizar", hasNotification: false });
+      await writeAuditLog("projects", record.recordId, "create", null, rest,
+        `Admin restauró proyecto "${rest.name}" desde historial`, ctx);
+      break;
+    }
+    case "orgHierarchies": {
+      // Restore hierarchy + collaborators + functions
+      const { hierarchy, collaborators = [], functions = [] } = oldData;
+      const { id: hId, ...hRest } = hierarchy;
+      await db.insert(orgHierarchies).values(hRest);
+      // Get the new hierarchy id
+      const newH = await db.select().from(orgHierarchies)
+        .where(and(eq(orgHierarchies.processId, hRest.processId), eq(orgHierarchies.name, hRest.name)))
+        .limit(1);
+      const newHId = newH[0]?.id ?? hId;
+      for (const collab of collaborators) {
+        const { id: cId, ...cRest } = collab;
+        await db.insert(orgCollaborators).values({ ...cRest, hierarchyId: newHId });
+        const newC = await db.select().from(orgCollaborators)
+          .where(and(eq(orgCollaborators.hierarchyId, newHId), eq(orgCollaborators.name, cRest.name)))
+          .limit(1);
+        const newCId = newC[0]?.id ?? cId;
+        for (const fn of functions.filter((f: any) => f.collaboratorId === cId)) {
+          const { id: fId, ...fRest } = fn;
+          await db.insert(collaboratorFunctions).values({ ...fRest, collaboratorId: newCId });
+        }
+      }
+      await writeAuditLog("orgHierarchies", record.recordId, "create", null, hierarchy,
+        `Admin restauró cargo/nivel "${hierarchy.name}" desde historial`, ctx);
+      break;
+    }
+    case "orgCollaborators": {
+      const { collaborator, functions: fns = [] } = oldData;
+      const { id: cId, ...cRest } = collaborator;
+      await db.insert(orgCollaborators).values(cRest);
+      const newC = await db.select().from(orgCollaborators)
+        .where(and(eq(orgCollaborators.hierarchyId, cRest.hierarchyId), eq(orgCollaborators.name, cRest.name)))
+        .limit(1);
+      const newCId = newC[0]?.id ?? cId;
+      for (const fn of fns) {
+        const { id: fId, ...fRest } = fn;
+        await db.insert(collaboratorFunctions).values({ ...fRest, collaboratorId: newCId });
+      }
+      await writeAuditLog("orgCollaborators", record.recordId, "create", null, collaborator,
+        `Admin restauró colaborador "${collaborator.name}" desde historial`, ctx);
+      break;
+    }
+    case "processInteractions": {
+      const { interaction, tasks = [], strengths = [] } = oldData;
+      const { id: iId, ...iRest } = interaction;
+      await db.insert(processInteractions).values(iRest);
+      const newI = await db.select().from(processInteractions)
+        .where(and(eq(processInteractions.processId, iRest.processId), eq(processInteractions.relatedProcessName, iRest.relatedProcessName)))
+        .limit(1);
+      const newIId = newI[0]?.id ?? iId;
+      for (const task of tasks) {
+        const { id: tId, ...tRest } = task;
+        await db.insert(interactionTasks).values({ ...tRest, interactionId: newIId });
+      }
+      for (const str of strengths) {
+        const { id: sId, ...sRest } = str;
+        await db.insert(interactionStrengths).values({ ...sRest, interactionId: newIId });
+      }
+      await writeAuditLog("processInteractions", record.recordId, "create", null, interaction,
+        `Admin restauró interacción con "${interaction.relatedProcessName}" desde historial`, ctx);
+      break;
+    }
+    default:
+      throw new Error(`Restoration not supported for table: ${record.tableName}`);
+  }
+
+  // Mark the audit entry as restored
+  await markAuditRestored(auditId);
+  return { success: true, tableName: record.tableName, recordId: record.recordId };
 }

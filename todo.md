@@ -188,3 +188,22 @@
 - [x] Recortar solo el cubo LIS (sin leyenda) del logo corporativo
 - [x] Reemplazar icon.png, splash-icon.png, favicon.png, android-icon-foreground.png con el cubo
 - [x] Actualizar logoUrl en app.config.ts con URL pública del cubo
+
+## Feature v11 - Historial de Auditoría y Restauración (solo Admin)
+
+### BD y Servidor
+- [x] Tabla `auditLog`: id, tableName, recordId, action (create/update/delete), oldData (JSON), newData (JSON), userId, userName, processId, processName, createdAt
+- [x] Interceptar todas las operaciones delete en db.ts para guardar snapshot en auditLog antes de borrar
+- [x] Endpoint tRPC: admin.audit.list (filtros: tableName, action, processId)
+- [x] Endpoint tRPC: admin.audit.restore (restaurar registro desde oldData, solo admin)
+- [x] Función restoreAuditRecord: soporte para orgHierarchies, orgCollaborators, kpis, processInteractions, projects
+
+### Pantalla Admin - Historial
+- [x] Pantalla `admin-historial.tsx`: lista de eventos de auditoría con filtros
+- [x] Filtros: por módulo (Organigrama, Colaboradores, KPIs, Interacciones, Proyectos), por tipo de acción
+- [x] Tarjeta de evento: fecha, usuario, módulo, acción, descripción del cambio
+- [x] Modal de detalle con snapshot del registro eliminado
+- [x] Botón "Restaurar" para registros eliminados (acción delete, no restaurados)
+- [x] Confirmación antes de restaurar
+- [x] Badge "RESTAURADO" para registros ya recuperados
+- [x] Tab "Historial" visible solo para admin/superadmin

@@ -243,3 +243,35 @@ export const appConfig = mysqlTable("appConfig", {
 
 export type AppConfig = typeof appConfig.$inferSelect;
 export type InsertAppConfig = typeof appConfig.$inferInsert;
+
+// ─── Audit Log ────────────────────────────────────────────────────────────────
+// Stores a snapshot of every create/update/delete operation for recovery.
+// Only admins can read and restore from this table.
+
+export const auditLog = mysqlTable("auditLog", {
+  id: int("id").autoincrement().primaryKey(),
+  // Which table and record was affected
+  tableName: varchar("tableName", { length: 64 }).notNull(),
+  recordId: int("recordId").notNull(),
+  // Type of operation
+  action: mysqlEnum("action", ["create", "update", "delete"]).notNull(),
+  // Full JSON snapshot of the record before the change (null for create)
+  oldData: text("oldData"),
+  // Full JSON snapshot of the record after the change (null for delete)
+  newData: text("newData"),
+  // Who performed the action
+  userId: int("userId"),
+  userName: varchar("userName", { length: 200 }),
+  userEmail: varchar("userEmail", { length: 200 }),
+  // Process context for easy filtering
+  processId: int("processId"),
+  processName: varchar("processName", { length: 200 }),
+  // Human-readable description of what changed
+  description: varchar("description", { length: 500 }),
+  // Whether this record has been restored
+  isRestored: boolean("isRestored").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AuditLog = typeof auditLog.$inferSelect;
+export type InsertAuditLog = typeof auditLog.$inferInsert;
