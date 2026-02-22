@@ -183,3 +183,8 @@
 ### Notificaciones
 - [x] Notificación in-app en tarjeta de proyectos cuando admin modifica
 - [x] Marcar notificación como leída al abrir el módulo de proyectos
+
+## Branding v10 - Ícono del cubo LIS
+- [x] Recortar solo el cubo LIS (sin leyenda) del logo corporativo
+- [x] Reemplazar icon.png, splash-icon.png, favicon.png, android-icon-foreground.png con el cubo
+- [x] Actualizar logoUrl en app.config.ts con URL pública del cubo

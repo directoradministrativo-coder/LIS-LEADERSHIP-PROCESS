@@ -31,8 +31,7 @@ const env = {
   appName: "LIS Levantamiento",
   appSlug: "lis-process-survey",
   // S3 URL of the app logo - set this to the URL returned by generate_image when creating custom logo
-  // Leave empty to use the default icon from assets/images/icon.png
-  logoUrl: "https://files.manuscdn.com/user_upload_by_module/session_file/310519663132434714/KkvFIsyMfRJoXuMD.png",
+  logoUrl: "https://files.manuscdn.com/user_upload_by_module/session_file/310519663132434714/zhfOCtzCKlaCJbfJ.png",
   scheme: schemeFromBundleId,
   iosBundleId: bundleId,
   androidPackage: bundleId,
