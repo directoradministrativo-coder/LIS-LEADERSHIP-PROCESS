@@ -346,3 +346,13 @@
 - [x] Progreso Consolidado: USER solo ve el suyo; ADMIN/SUPERADMIN ven todos con filtro por area/lider
 - [x] TypeScript: 0 errores
 - [x] Tests: 18/18 passing
+
+## Ajustes v19 - Interfaz y Funcionalidad (9 ajustes)
+- [x] Ajuste 1: SuperAdmin respeta perfil seleccionado (navegar como User = visual/permisos de User)
+- [x] Ajuste 2: Quitar tabs admin de barra inferior; agregar menú hamburguesa en header para admin/superadmin
+- [ ] Ajuste 3: Teclado no tapa formularios (KeyboardAvoidingView en todos los modales/formularios)
+- [ ] Ajuste 4: Botones Android (barra inferior del sistema) no tapan contenido de la app
+- [ ] Ajuste 5: Editar/eliminar en todos los módulos para user y superadmin
+- [ ] Ajuste 6: Organigrama admin integrado con filtro por proceso (corregir vista actual)
+- [ ] Ajuste 8: Interacciones del proceso - agregar opción de editar registros existentes
+- [ ] Ajuste 9: Progreso e Inicio se actualizan en tiempo real sin cerrar sesión

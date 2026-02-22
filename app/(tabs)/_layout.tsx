@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Pressable,
+  Modal,
 } from "react-native";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState, createContext, useContext } from "react";
@@ -20,53 +21,155 @@ const PROFILE_KEY = "lis_active_profile";
 const ROLE_KEY = "lis_user_role";
 
 // ─── LIS Role Context ─────────────────────────────────────────────────────────
+// "effectiveRole" is what the user is NAVIGATING AS (may differ from DB role for superadmin).
+// "dbRole" is the actual DB role (used for hamburger menu visibility).
 type LisRole = "user" | "admin" | "superadmin" | null;
 
-const LisRoleContext = createContext<LisRole>(null);
-export function useLisRole() { return useContext(LisRoleContext); }
+interface LisRoleContextValue {
+  effectiveRole: LisRole;   // role used for UI/permissions (profile selected)
+  dbRole: LisRole;          // actual DB role
+}
 
-// ─── Tab definitions ──────────────────────────────────────────────────────────
-// adminOnly: true → hidden for "user" role
+const LisRoleContext = createContext<LisRoleContextValue>({ effectiveRole: null, dbRole: null });
+
+/** Returns the EFFECTIVE role (what the user is navigating as). */
+export function useLisRole(): LisRole {
+  return useContext(LisRoleContext).effectiveRole;
+}
+
+/** Returns the DB role (used to decide if hamburger menu is shown). */
+export function useDbRole(): LisRole {
+  return useContext(LisRoleContext).dbRole;
+}
+
+// ─── Tab definitions (only non-admin tabs shown in bottom bar) ────────────────
 const TAB_DEFS: {
   name: string;
   title: string;
   icon: string;
-  adminOnly?: boolean;
 }[] = [
-  { name: "index",             title: "Inicio",       icon: "home" },
-  { name: "organigrama",       title: "Organigrama",  icon: "account-tree" },
-  { name: "organigrama-visual",title: "Vista Org.",   icon: "hub" },
-  { name: "kpis",              title: "KPIs",         icon: "bar-chart" },
-  { name: "dofa",              title: "DOFA",         icon: "search" },
-  { name: "interacciones",     title: "Interacciones",icon: "swap-horiz" },
-  { name: "proyectos",         title: "Proyectos",    icon: "rocket-launch" },
-  { name: "admin-progreso",    title: "Progreso",     icon: "leaderboard" },
-  // Admin-only tabs — hidden for "user" role
-  { name: "exportar",          title: "Exportar",     icon: "download",        adminOnly: true },
-  { name: "admin-usuarios",    title: "Usuarios",     icon: "manage-accounts", adminOnly: true },
-  { name: "admin-proyectos",   title: "Proy. Admin",  icon: "assignment",      adminOnly: true },
-  { name: "admin-historial",   title: "Historial",    icon: "history",         adminOnly: true },
+  { name: "index",              title: "Inicio",        icon: "home" },
+  { name: "organigrama",        title: "Organigrama",   icon: "account-tree" },
+  { name: "organigrama-visual", title: "Vista Org.",    icon: "hub" },
+  { name: "kpis",               title: "KPIs",          icon: "bar-chart" },
+  { name: "dofa",               title: "DOFA",          icon: "search" },
+  { name: "interacciones",      title: "Interacciones", icon: "swap-horiz" },
+  { name: "proyectos",          title: "Proyectos",     icon: "rocket-launch" },
+  { name: "admin-progreso",     title: "Progreso",      icon: "leaderboard" },
+  // Admin-only screens — NOT in tab bar, accessible via hamburger menu
+  { name: "exportar",           title: "Exportar",      icon: "download" },
+  { name: "admin-usuarios",     title: "Usuarios",      icon: "manage-accounts" },
+  { name: "admin-proyectos",    title: "Proy. Admin",   icon: "assignment" },
+  { name: "admin-historial",    title: "Historial",     icon: "history" },
 ];
 
+// Tabs shown in bottom bar (never admin-only ones)
+const BOTTOM_BAR_TABS = TAB_DEFS.slice(0, 8);
+
+// Admin-only items for hamburger menu
+const HAMBURGER_ITEMS = [
+  { name: "exportar",        title: "Exportar Reportes",    icon: "download" },
+  { name: "admin-usuarios",  title: "Gestión de Usuarios",  icon: "manage-accounts" },
+  { name: "admin-proyectos", title: "Proyectos Admin",      icon: "assignment" },
+  { name: "admin-historial", title: "Historial de Cambios", icon: "history" },
+];
+
+// ─── Hamburger Menu ───────────────────────────────────────────────────────────
+function HamburgerMenu({
+  navigation,
+  state,
+}: {
+  navigation: any;
+  state: any;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const routeMap: Record<string, number> = {};
+  state.routes.forEach((r: any, i: number) => { routeMap[r.name] = i; });
+
+  const navigate = (name: string) => {
+    setOpen(false);
+    navigation.navigate(name);
+  };
+
+  return (
+    <>
+      <Pressable
+        onPress={() => setOpen(true)}
+        style={styles.hamburgerBtn}
+        hitSlop={8}
+      >
+        <MaterialIcons name="menu" size={26} color="#CC2229" />
+      </Pressable>
+
+      <Modal
+        visible={open}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setOpen(false)}
+      >
+        <Pressable style={styles.menuOverlay} onPress={() => setOpen(false)}>
+          <View style={styles.menuPanel}>
+            {/* Header */}
+            <View style={styles.menuHeader}>
+              <Text style={styles.menuHeaderTitle}>Menú Admin</Text>
+              <Pressable onPress={() => setOpen(false)} hitSlop={8}>
+                <MaterialIcons name="close" size={22} color="#6B7280" />
+              </Pressable>
+            </View>
+            {/* Items */}
+            {HAMBURGER_ITEMS.map((item) => {
+              const routeIndex = routeMap[item.name];
+              const isFocused = routeIndex !== undefined && state.index === routeIndex;
+              return (
+                <Pressable
+                  key={item.name}
+                  style={[styles.menuItem, isFocused && styles.menuItemActive]}
+                  onPress={() => navigate(item.name)}
+                >
+                  <View style={[styles.menuItemIcon, isFocused && styles.menuItemIconActive]}>
+                    <MaterialIcons
+                      name={item.icon as any}
+                      size={22}
+                      color={isFocused ? "#FFFFFF" : "#CC2229"}
+                    />
+                  </View>
+                  <Text style={[styles.menuItemText, isFocused && styles.menuItemTextActive]}>
+                    {item.title}
+                  </Text>
+                  <MaterialIcons
+                    name="chevron-right"
+                    size={18}
+                    color={isFocused ? "#FFFFFF" : "#9CA3AF"}
+                  />
+                </Pressable>
+              );
+            })}
+          </View>
+        </Pressable>
+      </Modal>
+    </>
+  );
+}
+
 // ─── Custom Tab Bar ───────────────────────────────────────────────────────────
-// Fully reactive: filters visible tabs on every render based on lisRole.
 function CustomTabBar({
   state,
   navigation,
-  lisRole,
+  effectiveRole,
+  dbRole,
   bottomPadding,
   tabBarHeight,
-}: BottomTabBarProps & { lisRole: LisRole; bottomPadding: number; tabBarHeight: number }) {
-  const isAdmin = lisRole === "admin" || lisRole === "superadmin";
+}: BottomTabBarProps & {
+  effectiveRole: LisRole;
+  dbRole: LisRole;
+  bottomPadding: number;
+  tabBarHeight: number;
+}) {
+  const isAdmin = dbRole === "admin" || dbRole === "superadmin";
 
-  // Map route name → index in state.routes
   const routeMap: Record<string, number> = {};
   state.routes.forEach((r, i) => { routeMap[r.name] = i; });
-
-  const visibleTabs = TAB_DEFS.filter((t) => {
-    if (t.adminOnly && !isAdmin) return false;
-    return routeMap[t.name] !== undefined;
-  });
 
   return (
     <View
@@ -78,10 +181,13 @@ function CustomTabBar({
         paddingTop: 6,
         paddingBottom: bottomPadding,
         height: tabBarHeight,
+        alignItems: "center",
       }}
     >
-      {visibleTabs.map((tab) => {
+      {/* Bottom bar tabs — always the same 8 tabs for all roles */}
+      {BOTTOM_BAR_TABS.map((tab) => {
         const routeIndex = routeMap[tab.name];
+        if (routeIndex === undefined) return null;
         const isFocused = state.index === routeIndex;
         const color = isFocused ? "#CC2229" : "#9CA3AF";
 
@@ -118,17 +224,22 @@ function CustomTabBar({
           </Pressable>
         );
       })}
+
+      {/* Hamburger menu button — only for admin/superadmin DB role */}
+      {isAdmin && (
+        <View style={{ width: 44, alignItems: "center", justifyContent: "center" }}>
+          <HamburgerMenu navigation={navigation} state={state} />
+        </View>
+      )}
     </View>
   );
 }
 
 // ─── Role Resolver ────────────────────────────────────────────────────────────
-// Resolves the LIS role from the DB and calls onResolved.
-// Renders a loading/error screen while resolving.
 function RoleResolver({
   onResolved,
 }: {
-  onResolved: (role: LisRole) => void;
+  onResolved: (effectiveRole: LisRole, dbRole: LisRole) => void;
 }) {
   const { user, isAuthenticated, loading, logout } = useAuth();
 
@@ -143,7 +254,7 @@ function RoleResolver({
     try { await logout(); } catch { /* ignore */ }
     await Storage.removeItem(PROFILE_KEY);
     await Storage.removeItem(ROLE_KEY);
-    onResolved(null);
+    onResolved(null, null);
     router.replace("/login" as any);
   };
 
@@ -154,20 +265,27 @@ function RoleResolver({
     }
     if (checkAuth.isSuccess) {
       if (checkAuth.data?.authorized) {
-        const lisRole = (checkAuth.data.role ?? "user") as LisRole;
-        Storage.setItem(ROLE_KEY, lisRole ?? "user");
+        const dbRole = (checkAuth.data.role ?? "user") as LisRole;
+        Storage.setItem(ROLE_KEY, dbRole ?? "user");
 
-        if (lisRole === "superadmin") {
+        if (dbRole === "superadmin") {
+          // SuperAdmin: check which profile they selected
           Storage.getItem(PROFILE_KEY).then(savedProfile => {
             if (!savedProfile) {
+              // No profile selected yet → go to profile selector
               router.replace("/select-profile" as any);
             } else {
-              onResolved(lisRole);
+              // Use the selected profile as effective role
+              // "user" profile → effectiveRole = "user"
+              // "admin" profile → effectiveRole = "superadmin" (full admin access)
+              const effectiveRole: LisRole = savedProfile === "user" ? "user" : "superadmin";
+              onResolved(effectiveRole, dbRole);
             }
           });
           return;
         }
-        onResolved(lisRole);
+        // Regular user or admin: effective role = DB role
+        onResolved(dbRole, dbRole);
       } else {
         Storage.removeItem(ROLE_KEY);
         setUnauthorized(true);
@@ -214,7 +332,6 @@ function RoleResolver({
     );
   }
 
-  // Still resolving (waiting for onResolved to be called)
   return (
     <View style={styles.gateContainer}>
       <ActivityIndicator size="large" color="#CC2229" />
@@ -230,8 +347,7 @@ export default function TabLayout() {
   const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 8);
   const tabBarHeight = 56 + bottomPadding;
 
-  // lisRole starts as null — Tabs are NOT rendered until it is resolved.
-  const [lisRole, setLisRole] = useState<LisRole>(null);
+  const [roles, setRoles] = useState<{ effectiveRole: LisRole; dbRole: LisRole } | null>(null);
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -239,7 +355,6 @@ export default function TabLayout() {
     }
   }, [loading, isAuthenticated]);
 
-  // Show loading while auth state is being determined
   if (loading || (!isAuthenticated && !loading)) {
     return (
       <View style={{ flex: 1, backgroundColor: "#FFFFFF", justifyContent: "center", alignItems: "center" }}>
@@ -256,25 +371,26 @@ export default function TabLayout() {
     );
   }
 
-  // Phase 1: Role not yet resolved → show RoleResolver (loading/unauthorized screen)
-  // The RoleResolver calls setLisRole when done, which triggers a re-render into Phase 2.
-  if (lisRole === null) {
+  if (roles === null) {
     return (
-      <LisRoleContext.Provider value={null}>
-        <RoleResolver onResolved={setLisRole} />
+      <LisRoleContext.Provider value={{ effectiveRole: null, dbRole: null }}>
+        <RoleResolver
+          onResolved={(effectiveRole, dbRole) => setRoles({ effectiveRole, dbRole })}
+        />
       </LisRoleContext.Provider>
     );
   }
 
-  // Phase 2: Role is known → render Tabs with correct CustomTabBar
-  // lisRole is guaranteed non-null here, so CustomTabBar filters correctly from the first render.
+  const { effectiveRole, dbRole } = roles;
+
   return (
-    <LisRoleContext.Provider value={lisRole}>
+    <LisRoleContext.Provider value={{ effectiveRole, dbRole }}>
       <Tabs
         tabBar={(props) => (
           <CustomTabBar
             {...props}
-            lisRole={lisRole}
+            effectiveRole={effectiveRole}
+            dbRole={dbRole}
             bottomPadding={bottomPadding}
             tabBarHeight={tabBarHeight}
           />
@@ -376,5 +492,71 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "700",
     fontSize: 15,
+  },
+  // Hamburger button
+  hamburgerBtn: {
+    padding: 4,
+  },
+  // Menu overlay
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "flex-end",
+  },
+  menuPanel: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 32,
+    paddingTop: 8,
+    gap: 4,
+  },
+  menuHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+    marginBottom: 8,
+  },
+  menuHeaderTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#1A1A2E",
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    gap: 14,
+    backgroundColor: "#F9FAFB",
+    marginBottom: 6,
+  },
+  menuItemActive: {
+    backgroundColor: "#CC2229",
+  },
+  menuItemIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: "#FEE2E2",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  menuItemIconActive: {
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  menuItemText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#1A1A2E",
+  },
+  menuItemTextActive: {
+    color: "#FFFFFF",
   },
 });

@@ -7,7 +7,7 @@ import { useState, useEffect, useRef } from "react";
 import { router } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Storage } from "@/lib/storage";
-import { useLisRole } from "./_layout";
+import { useLisRole, useDbRole } from "./_layout";
 
 const PROFILE_KEY = "lis_active_profile";
 
@@ -60,9 +60,11 @@ export default function HomeScreen() {
   const [tempName, setTempName] = useState("");
   const [activeProfile, setActiveProfile] = useState<"user" | "admin">("user");
 
-  // Use the LIS-table role from context (set by AuthorizationGate after DB check)
+  // effectiveRole = what the user is navigating as (may be "user" for superadmin navigating as user)
   const lisRole = useLisRole();
-  const isSuperAdmin = lisRole === "superadmin";
+  // dbRole = actual DB role (used for UI chrome: badge, profile switcher, hamburger)
+  const dbRole = useDbRole();
+  const isSuperAdmin = dbRole === "superadmin";
   const isAdmin = lisRole === "admin" || lisRole === "superadmin";
 
   useEffect(() => {
@@ -141,8 +143,8 @@ export default function HomeScreen() {
           resizeMode="contain"
         />
         <View style={styles.headerActions}>
-          {/* Settings button - visible for admin and superadmin */}
-          {isAdmin && (
+          {/* Settings button - visible for admin and superadmin (based on dbRole) */}
+          {(dbRole === "admin" || dbRole === "superadmin") && (
             <TouchableOpacity
               style={styles.settingsBtn}
               onPress={() => router.push("/(tabs)/admin-usuarios" as any)}
