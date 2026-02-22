@@ -7,12 +7,12 @@ import {
   TextInput,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   Modal,
   Platform,
   KeyboardAvoidingView,
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
+import { useAppAlert } from "@/components/app-alert";
 import { trpc } from "@/lib/trpc";
 import { useLisRole } from "./_layout";
 
@@ -152,6 +152,7 @@ function UserProgressView() {
 }
 
 export default function AdminProgresoScreen() {
+  const { alert: appAlert, toast } = useAppAlert();
   const lisRole = useLisRole();
   const isAdmin = lisRole === "admin" || lisRole === "superadmin";
   const [showDeadlineModal, setShowDeadlineModal] = useState(false);
@@ -174,14 +175,14 @@ export default function AdminProgresoScreen() {
     onSuccess: () => {
       refetchDeadline();
       setShowDeadlineModal(false);
-      Alert.alert("Éxito", "Fecha límite actualizada correctamente.");
+      toast({ type: "success", message: "Fecha límite actualizada correctamente." });
     },
-    onError: (e) => Alert.alert("Error", e.message),
+    onError: (e) => appAlert({ title: "Error", message: e.message }),
   });
 
   const handleSetDeadline = () => {
     if (!deadlineInput.trim()) {
-      Alert.alert("Error", "Ingresa una fecha válida.");
+      appAlert({ title: "Error", message: "Ingresa una fecha válida." });
       return;
     }
     setDeadlineMutation.mutate({ deadline: deadlineInput });

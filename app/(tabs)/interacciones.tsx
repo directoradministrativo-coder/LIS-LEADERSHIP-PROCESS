@@ -1,9 +1,10 @@
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
-  Alert, ActivityIndicator, FlatList, Modal
+  ActivityIndicator, FlatList, Modal
 } from "react-native";
 import { KeyboardModal } from "@/components/keyboard-modal";
 import { ScreenContainer } from "@/components/screen-container";
+import { useAppAlert } from "@/components/app-alert";
 import { trpc } from "@/lib/trpc";
 import { useState, useMemo, useCallback } from "react";
 import { useLocalSearchParams } from "expo-router";
@@ -587,6 +588,7 @@ const adminModalStyles = StyleSheet.create({
 // ─── User View: Own Interactions ──────────────────────────────────────────────
 
 export default function InteraccionesScreen() {
+  const { alert: appAlert } = useAppAlert();
   const params = useLocalSearchParams<{ type?: string }>();
   const [activeType, setActiveType] = useState<InteractionType>(
     (params.type as InteractionType) ?? "proveedor"
@@ -872,10 +874,14 @@ export default function InteraccionesScreen() {
                           <MaterialIcons name="edit" size={18} color="#6B7280" />
                         </TouchableOpacity>
                         <TouchableOpacity
-                          onPress={() => Alert.alert("Eliminar", `¿Eliminar "${interaction.relatedProcessName}"?`, [
-                            { text: "Cancelar", style: "cancel" },
-                            { text: "Eliminar", style: "destructive", onPress: () => deleteInteraction.mutate({ id: interaction.id }) },
-                          ])}
+                          onPress={() => appAlert({
+                            title: "Eliminar",
+                            message: `¿Eliminar "${interaction.relatedProcessName}"?`,
+                            buttons: [
+                              { text: "Cancelar", style: "cancel" },
+                              { text: "Eliminar", style: "destructive", onPress: () => deleteInteraction.mutate({ id: interaction.id }) },
+                            ],
+                          })}
                         >
                           <Text style={styles.deleteIcon}>🗑</Text>
                         </TouchableOpacity>

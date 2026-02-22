@@ -470,3 +470,22 @@
 - [x] Modal editar fortaleza/oportunidad
 - [x] Modal confirmar eliminar tarea/fortaleza
 - [x] Notificaciones al usuario en cada acción admin (editar nombre, eliminar, editar/eliminar tarea/fortaleza)
+
+## Ajuste v29 — Reemplazar todos los Alert.alert por modales propios (compatibilidad web)
+
+### Componente reutilizable
+- [x] AppAlertProvider + useAppAlert hook creado en components/app-alert.tsx
+- [x] Soporta: alert (modal con botones), toast (notificación temporal automática)
+- [x] AppAlertProvider agregado al layout raíz (_layout.tsx)
+
+### Archivos migrados (36 ocurrencias en 9 archivos → 0 Alert.alert restantes)
+- [x] index.tsx (1): validación nombre proceso
+- [x] organigrama.tsx (4): validación nombre, eliminar jerarquía, eliminar colaborador
+- [x] kpis.tsx (3): eliminar KPI (admin, user, superadmin)
+- [x] interacciones.tsx (1): eliminar interacción user
+- [x] exportar.tsx (9): errores y éxitos de exportación
+- [x] admin-usuarios.tsx (4): error crear, importar CSV, eliminar usuario, cambiar rol
+- [x] proyectos.tsx (6): eliminar proyecto, errores mutaciones, validación campos
+- [x] admin-proyectos.tsx (2): error update, validación observaciones
+- [x] admin-progreso.tsx (3): éxito/error deadline, validación fecha
+- [x] 0 imports de Alert restantes en el proyecto

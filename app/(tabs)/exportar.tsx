@@ -1,7 +1,8 @@
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
+import { useAppAlert } from "@/components/app-alert";
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 import { buildExcelWorkbook, buildConsolidatedExcelWorkbook, downloadExcel } from "@/lib/excel-export";
@@ -18,6 +19,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 ];
 
 export default function ExportarScreen() {
+  const { alert: appAlert, toast } = useAppAlert();
   const lisRole = useLisRole();
   const isAdmin = lisRole === "admin" || lisRole === "superadmin";
 
@@ -93,7 +95,7 @@ export default function ExportarScreen() {
         (item: any) => (item.process?.id ?? item.id) === processId
       );
       if (!rawItem) {
-        Alert.alert("Error", "No se encontraron datos para este proceso.");
+        appAlert({ title: "Error", message: "No se encontraron datos para este proceso." });
         return;
       }
       const proc = rawItem.process ?? rawItem;
@@ -108,7 +110,7 @@ export default function ExportarScreen() {
       const filename = `LIS_Levantamiento_${pName}_${new Date().toISOString().split("T")[0]}.xlsx`;
       await downloadExcel(wb, filename);
     } catch (error) {
-      Alert.alert("Error", "No se pudo generar el archivo Excel individual.");
+      appAlert({ title: "Error", message: "No se pudo generar el archivo Excel individual." });
       console.error(error);
     } finally {
       setExportingProcessId(null);
@@ -117,11 +119,11 @@ export default function ExportarScreen() {
 
   const handleExportIndividual = async () => {
     if (!process?.processName) {
-      Alert.alert("Proceso sin nombre", "Por favor, ingresa el nombre del proceso antes de exportar");
+      appAlert({ title: "Proceso sin nombre", message: "Por favor, ingresa el nombre del proceso antes de exportar" });
       return;
     }
     if (totalItems === 0) {
-      Alert.alert("Sin datos", "No hay información registrada para exportar. Completa al menos un módulo.");
+      appAlert({ title: "Sin datos", message: "No hay información registrada para exportar. Completa al menos un módulo." });
       return;
     }
     setIsExporting(true);
@@ -136,7 +138,7 @@ export default function ExportarScreen() {
       const filename = `LIS_Levantamiento_${process.processName.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.xlsx`;
       await downloadExcel(wb, filename);
     } catch (error) {
-      Alert.alert("Error", "No se pudo generar el archivo Excel. Intenta nuevamente.");
+      appAlert({ title: "Error", message: "No se pudo generar el archivo Excel. Intenta nuevamente." });
     } finally {
       setIsExporting(false);
     }
@@ -148,7 +150,7 @@ export default function ExportarScreen() {
       : selectedProcessIds;
 
     if (targetIds.length === 0) {
-      Alert.alert("Sin procesos seleccionados", "Selecciona al menos un proceso para exportar.");
+      appAlert({ title: "Sin procesos seleccionados", message: "Selecciona al menos un proceso para exportar." });
       return;
     }
     setIsExporting(true);
@@ -158,7 +160,7 @@ export default function ExportarScreen() {
         .filter((item: any) => targetIds.includes(item.process?.id ?? item.id));
 
       if (selectedData.length === 0) {
-        Alert.alert("Sin datos", "No se encontraron datos para los procesos seleccionados.");
+        appAlert({ title: "Sin datos", message: "No se encontraron datos para los procesos seleccionados." });
         return;
       }
 
@@ -168,9 +170,9 @@ export default function ExportarScreen() {
 
       const filename = `LIS_Consolidado_${exportMode === "consolidated" ? "Todos" : "Seleccion"}_${new Date().toISOString().split("T")[0]}.xlsx`;
       await downloadExcel(wb, filename);
-      Alert.alert("Éxito", `Archivo consolidado generado con ${selectedData.length} proceso(s) y 7 hojas de datos.`);
+      toast({ type: "success", message: `Archivo consolidado generado con ${selectedData.length} proceso(s) y 7 hojas de datos.` });
     } catch (error) {
-      Alert.alert("Error", "No se pudo generar el archivo Excel consolidado.");
+      appAlert({ title: "Error", message: "No se pudo generar el archivo Excel consolidado." });
       console.error(error);
     } finally {
       setIsExporting(false);
@@ -368,7 +370,7 @@ export default function ExportarScreen() {
               onPress={async () => {
                 const auditData = auditLogQuery.data;
                 if (!auditData || auditData.length === 0) {
-                  Alert.alert("Sin datos", "No hay registros de auditoría para exportar.");
+                  appAlert({ title: "Sin datos", message: "No hay registros de auditoría para exportar." });
                   return;
                 }
                 setIsExporting(true);
@@ -411,7 +413,7 @@ export default function ExportarScreen() {
                   const filename = `LIS_Historial_${new Date().toISOString().split("T")[0]}.xlsx`;
                   await downloadExcel(wb, filename);
                 } catch (e) {
-                  Alert.alert("Error", "No se pudo generar el archivo de historial.");
+                  appAlert({ title: "Error", message: "No se pudo generar el archivo de historial." });
                 } finally {
                   setIsExporting(false);
                 }

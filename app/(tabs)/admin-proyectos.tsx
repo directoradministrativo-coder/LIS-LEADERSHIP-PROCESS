@@ -6,13 +6,13 @@ import {
   TouchableOpacity,
   TextInput,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   FlatList,
   Modal,
 } from "react-native";
 import { KeyboardModal } from "@/components/keyboard-modal";
 import { ScreenContainer } from "@/components/screen-container";
+import { useAppAlert } from "@/components/app-alert";
 import { trpc } from "@/lib/trpc";
 
 const LIS_RED = "#E63946";
@@ -87,6 +87,7 @@ function RatingSelector({
 }
 
 export default function AdminProyectosScreen() {
+  const { alert: appAlert } = useAppAlert();
   const [editingProject, setEditingProject] = useState<AdminProject | null>(null);
   const [editImpact, setEditImpact] = useState(3);
   const [editDifficulty, setEditDifficulty] = useState(3);
@@ -102,7 +103,7 @@ export default function AdminProyectosScreen() {
       refetch();
       setEditingProject(null);
     },
-    onError: (e) => Alert.alert("Error", e.message),
+    onError: (e) => appAlert({ title: "Error", message: e.message }),
   });
 
   const openEdit = useCallback((project: AdminProject) => {
@@ -118,10 +119,10 @@ export default function AdminProyectosScreen() {
 
     // Validate observations for Suspendido/Cancelado
     if ((editStatus === "suspendido" || editStatus === "cancelado") && !editObservations.trim()) {
-      Alert.alert(
-        "Observaciones requeridas",
-        `Para el estado "${STATUS_CONFIG[editStatus].label}" es obligatorio agregar observaciones.`
-      );
+      appAlert({
+        title: "Observaciones requeridas",
+        message: `Para el estado "${STATUS_CONFIG[editStatus].label}" es obligatorio agregar observaciones.`,
+      });
       return;
     }
 

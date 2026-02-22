@@ -1,4 +1,5 @@
-import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, Alert, Linking } from "react-native";
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, Linking } from "react-native";
+import { useAppAlert } from "@/components/app-alert";
 import { ScreenContainer } from "@/components/screen-container";
 import { useAuth } from "@/hooks/use-auth";
 import { useColors } from "@/hooks/use-colors";
@@ -125,9 +126,11 @@ export default function HomeScreen() {
     }
   }, [processQuery.data]);
 
+  const { alert } = useAppAlert();
+
   const handleSaveName = () => {
     if (!tempName.trim()) {
-      Alert.alert("Error", "El nombre del proceso no puede estar vacío");
+      alert({ title: "Error", message: "El nombre del proceso no puede estar vacío" });
       return;
     }
     updateProcess.mutate({ processName: tempName.trim() });

@@ -1,9 +1,10 @@
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
-  Alert, ActivityIndicator, FlatList
+  ActivityIndicator, FlatList
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { KeyboardModal } from "@/components/keyboard-modal";
+import { useAppAlert } from "@/components/app-alert";
 import { trpc } from "@/lib/trpc";
 import { useState, useMemo } from "react";
 import { useLisRole } from "./_layout";
@@ -104,21 +105,27 @@ function AdminKPIsView() {
     setShowEditModal(true);
   };
 
+  const { alert: appAlert } = useAppAlert();
+
   const handleDelete = (id: number, name: string) => {
     const processGroup = allData.find(p => p.kpis.some(k => k.id === id));
-    Alert.alert("Eliminar KPI", `¿Eliminar el KPI "${name}"?`, [
-      { text: "Cancelar", style: "cancel" },
-      { text: "Eliminar", style: "destructive", onPress: () => {
-        deleteKPI.mutate({ id });
-        if (processGroup) {
-          createNotification.mutate({
-            processId: processGroup.processId,
-            module: "kpis",
-            message: `Se eliminó el KPI "${name}"`,
-          });
-        }
-      }},
-    ]);
+    appAlert({
+      title: "Eliminar KPI",
+      message: `¿Eliminar el KPI "${name}"?`,
+      buttons: [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Eliminar", style: "destructive", onPress: () => {
+          deleteKPI.mutate({ id });
+          if (processGroup) {
+            createNotification.mutate({
+              processId: processGroup.processId,
+              module: "kpis",
+              message: `Se eliminó el KPI "${name}"`,
+            });
+          }
+        }},
+      ],
+    });
   };
 
   if (allKPIsQuery.isLoading) {
@@ -257,6 +264,7 @@ function AdminKPIsView() {
 // ─── User View: Own KPIs ──────────────────────────────────────────────────────
 
 function UserKPIsView() {
+  const { alert: appAlert } = useAppAlert();
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<KPIForm>(EMPTY_FORM);
@@ -310,10 +318,14 @@ function UserKPIsView() {
   };
 
   const handleDelete = (id: number, name: string) => {
-    Alert.alert("Eliminar KPI", `¿Eliminar el KPI "${name}"?`, [
-      { text: "Cancelar", style: "cancel" },
-      { text: "Eliminar", style: "destructive", onPress: () => deleteKPI.mutate({ id }) },
-    ]);
+    appAlert({
+      title: "Eliminar KPI",
+      message: `¿Eliminar el KPI "${name}"?`,
+      buttons: [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Eliminar", style: "destructive", onPress: () => deleteKPI.mutate({ id }) },
+      ],
+    });
   };
 
   const kpis = kpisQuery.data ?? [];
@@ -464,6 +476,7 @@ export default function KPIsScreen() {
 
 // Wrapper to allow the header add button to work
 function UserKPIsViewWrapper() {
+  const { alert: appAlert } = useAppAlert();
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<KPIForm>(EMPTY_FORM);
@@ -517,10 +530,14 @@ function UserKPIsViewWrapper() {
   };
 
   const handleDelete = (id: number, name: string) => {
-    Alert.alert("Eliminar KPI", `¿Eliminar el KPI "${name}"?`, [
-      { text: "Cancelar", style: "cancel" },
-      { text: "Eliminar", style: "destructive", onPress: () => deleteKPI.mutate({ id }) },
-    ]);
+    appAlert({
+      title: "Eliminar KPI",
+      message: `¿Eliminar el KPI "${name}"?`,
+      buttons: [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Eliminar", style: "destructive", onPress: () => deleteKPI.mutate({ id }) },
+      ],
+    });
   };
 
   const kpis = kpisQuery.data ?? [];

@@ -6,12 +6,12 @@ import {
   TouchableOpacity,
   TextInput,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   FlatList,
 } from "react-native";
 import { KeyboardModal } from "@/components/keyboard-modal";
 import { ScreenContainer } from "@/components/screen-container";
+import { useAppAlert } from "@/components/app-alert";
 import { trpc } from "@/lib/trpc";
 import { useLisRole } from "./_layout";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -89,6 +89,7 @@ function ProjectCard({
   onDelete: (id: number) => void;
   onDismissNotification: (id: number) => void;
 }) {
+  const { alert: appAlert } = useAppAlert();
   const statusCfg = STATUS_CONFIG[project.status];
   const scoreColor =
     project.subtotal >= 20
@@ -166,11 +167,15 @@ function ProjectCard({
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionBtn, { borderColor: LIS_RED }]}
-          onPress={() =>
-            Alert.alert("Eliminar proyecto", `¿Eliminar "${project.name}"?`, [
-              { text: "Cancelar", style: "cancel" },
-              { text: "Eliminar", style: "destructive", onPress: () => onDelete(project.id) },
-            ])
+           onPress={() =>
+             appAlert({
+               title: "Eliminar proyecto",
+               message: `¿Eliminar "${project.name}"?`,
+               buttons: [
+                 { text: "Cancelar", style: "cancel" },
+                 { text: "Eliminar", style: "destructive", onPress: () => onDelete(project.id) },
+               ],
+             })
           }
         >
           <Text style={[styles.actionBtnText, { color: LIS_RED }]}>Eliminar</Text>
@@ -181,6 +186,7 @@ function ProjectCard({
 }
 
 export default function ProyectosScreen() {
+  const { alert: appAlert } = useAppAlert();
   const lisRole = useLisRole();
   const isAdmin = lisRole === "admin" || lisRole === "superadmin";
   const [showForm, setShowForm] = useState(false);
@@ -226,7 +232,7 @@ export default function ProyectosScreen() {
       refetch();
       resetForm();
     },
-    onError: (e) => Alert.alert("Error", e.message),
+    onError: (e) => appAlert({ title: "Error", message: e.message }),
   });
 
   const updateMutation = trpc.project.update.useMutation({
@@ -234,12 +240,12 @@ export default function ProyectosScreen() {
       refetch();
       resetForm();
     },
-    onError: (e) => Alert.alert("Error", e.message),
+    onError: (e) => appAlert({ title: "Error", message: e.message }),
   });
 
   const deleteMutation = trpc.project.delete.useMutation({
     onSuccess: () => refetch(),
-    onError: (e) => Alert.alert("Error", e.message),
+    onError: (e) => appAlert({ title: "Error", message: e.message }),
   });
 
   const dismissMutation = trpc.project.dismissNotification.useMutation({
@@ -266,11 +272,11 @@ export default function ProyectosScreen() {
 
   const handleSave = useCallback(() => {
     if (!name.trim()) {
-      Alert.alert("Campo requerido", "El nombre del proyecto es obligatorio.");
+      appAlert({ title: "Campo requerido", message: "El nombre del proyecto es obligatorio." });
       return;
     }
     if (!description.trim()) {
-      Alert.alert("Campo requerido", "La descripción del proyecto es obligatoria.");
+      appAlert({ title: "Campo requerido", message: "La descripción del proyecto es obligatoria." });
       return;
     }
 

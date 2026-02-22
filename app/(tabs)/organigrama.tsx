@@ -1,9 +1,10 @@
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
-  Alert, ActivityIndicator, FlatList
+  ActivityIndicator, FlatList
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { KeyboardModal } from "@/components/keyboard-modal";
+import { useAppAlert } from "@/components/app-alert";
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 
@@ -119,9 +120,11 @@ export default function OrganigramaScreen() {
 
   const getLevelInfo = (level: number) => HIERARCHY_LEVELS.find(l => l.level === level) ?? HIERARCHY_LEVELS[4];
 
+  const { alert } = useAppAlert();
+
   const handleAddHierarchy = () => {
     if (!newHierarchyName.trim()) {
-      Alert.alert("Error", "Ingresa el nombre del cargo");
+      alert({ title: "Error", message: "Ingresa el nombre del cargo" });
       return;
     }
     createHierarchy.mutate({ name: newHierarchyName.trim(), level: newHierarchyLevel });
@@ -141,7 +144,7 @@ export default function OrganigramaScreen() {
 
   const handleAddCollaborator = () => {
     if (!newCollaboratorName.trim() || !selectedHierarchyId) {
-      Alert.alert("Error", "Ingresa el nombre del colaborador");
+      alert({ title: "Error", message: "Ingresa el nombre del colaborador" });
       return;
     }
     createCollaborator.mutate({
@@ -237,10 +240,14 @@ export default function OrganigramaScreen() {
                             <Text style={styles.editIcon}>✏️</Text>
                           </TouchableOpacity>
                           <TouchableOpacity
-                            onPress={() => Alert.alert("Eliminar", `¿Eliminar "${hierarchy.name}" y sus colaboradores?`, [
-                              { text: "Cancelar", style: "cancel" },
-                              { text: "Eliminar", style: "destructive", onPress: () => deleteHierarchy.mutate({ id: hierarchy.id }) },
-                            ])}
+                            onPress={() => alert({
+                              title: "Eliminar",
+                              message: `¿Eliminar "${hierarchy.name}" y sus colaboradores?`,
+                              buttons: [
+                                { text: "Cancelar", style: "cancel" },
+                                { text: "Eliminar", style: "destructive", onPress: () => deleteHierarchy.mutate({ id: hierarchy.id }) },
+                              ],
+                            })}
                           >
                             <Text style={styles.deleteIcon}>🗑</Text>
                           </TouchableOpacity>
@@ -269,10 +276,14 @@ export default function OrganigramaScreen() {
                                   <Text style={styles.editIcon}>✏️</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
-                                  onPress={() => Alert.alert("Eliminar", `¿Eliminar a "${collab.name}"?`, [
-                                    { text: "Cancelar", style: "cancel" },
-                                    { text: "Eliminar", style: "destructive", onPress: () => deleteCollaborator.mutate({ id: collab.id }) },
-                                  ])}
+                                  onPress={() => alert({
+                                    title: "Eliminar",
+                                    message: `¿Eliminar a "${collab.name}"?`,
+                                    buttons: [
+                                      { text: "Cancelar", style: "cancel" },
+                                      { text: "Eliminar", style: "destructive", onPress: () => deleteCollaborator.mutate({ id: collab.id }) },
+                                    ],
+                                  })}
                                 >
                                   <Text style={styles.deleteIcon}>🗑</Text>
                                 </TouchableOpacity>

@@ -1,9 +1,10 @@
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  TextInput, Alert, ActivityIndicator, FlatList, Platform
+  TextInput, ActivityIndicator, FlatList, Platform
 } from "react-native";
 import { KeyboardModal } from "@/components/keyboard-modal";
 import { ScreenContainer } from "@/components/screen-container";
+import { useAppAlert } from "@/components/app-alert";
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -45,6 +46,7 @@ function parseCSV(text: string): Array<{ email: string; name: string; areaName: 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function AdminUsuariosScreen() {
+  const { alert: appAlert, toast } = useAppAlert();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [form, setForm] = useState<UserForm>(EMPTY_FORM);
@@ -62,7 +64,7 @@ export default function AdminUsuariosScreen() {
       setFormErrors([]);
     },
     onError: (err) => {
-      Alert.alert("Error", err.message.includes("Duplicate") ? "Este email ya está registrado." : err.message);
+      appAlert({ title: "Error", message: err.message.includes("Duplicate") ? "Este email ya está registrado." : err.message });
     },
   });
 
@@ -96,7 +98,7 @@ export default function AdminUsuariosScreen() {
   const handleImportCSV = async () => {
     const rows = parseCSV(csvText);
     if (rows.length === 0) {
-      Alert.alert("Error", "No se encontraron filas válidas en el CSV.\n\nFormato esperado:\nemail,nombre,area,rol");
+      appAlert({ title: "Error", message: "No se encontraron filas válidas en el CSV.\n\nFormato esperado:\nemail,nombre,area,rol" });
       return;
     }
     setImporting(true);
@@ -114,18 +116,18 @@ export default function AdminUsuariosScreen() {
     setShowImportModal(false);
     setCsvText("");
     usersQuery.refetch();
-    Alert.alert("Importación completada", `✅ ${success} usuarios importados\n${errors > 0 ? `⚠️ ${errors} errores (emails duplicados)` : ""}`);
+    toast({ type: "success", message: `${success} usuarios importados${errors > 0 ? `, ${errors} errores (emails duplicados)` : ""}` });
   };
 
   const handleDelete = (id: number, name: string) => {
-    Alert.alert(
-      "Eliminar usuario",
-      `¿Deseas eliminar a "${name}" de la lista autorizada?`,
-      [
+    appAlert({
+      title: "Eliminar usuario",
+      message: `¿Deseas eliminar a "${name}" de la lista autorizada?`,
+      buttons: [
         { text: "Cancelar", style: "cancel" },
         { text: "Eliminar", style: "destructive", onPress: () => deleteUser.mutate({ id }) },
-      ]
-    );
+      ],
+    });
   };
 
   const ROLE_LABELS: Record<Role, string> = {
@@ -143,14 +145,14 @@ export default function AdminUsuariosScreen() {
   const toggleRole = (id: number, currentRole: Role) => {
     const roles: Role[] = ["user", "admin", "superadmin"];
     const nextRole = roles[(roles.indexOf(currentRole) + 1) % roles.length];
-    Alert.alert(
-      "Cambiar rol",
-      `¿Cambiar a ${ROLE_LABELS[nextRole]}?`,
-      [
+    appAlert({
+      title: "Cambiar rol",
+      message: `¿Cambiar a ${ROLE_LABELS[nextRole]}?`,
+      buttons: [
         { text: "Cancelar", style: "cancel" },
         { text: "Confirmar", onPress: () => updateUser.mutate({ id, role: nextRole }) },
-      ]
-    );
+      ],
+    });
   };
 
   const users = usersQuery.data ?? [];
