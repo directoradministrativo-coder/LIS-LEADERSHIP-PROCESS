@@ -489,3 +489,9 @@
 - [x] admin-proyectos.tsx (2): error update, validación observaciones
 - [x] admin-progreso.tsx (3): éxito/error deadline, validación fecha
 - [x] 0 imports de Alert restantes en el proyecto
+
+## Bug v30 — Color de texto ilegible en interacciones admin
+
+- [x] Cambiar color del texto de descripción de tareas en vista expandida admin: #1D3557 (nombre) + #4B5563 (meta)
+- [x] Cambiar color del texto de fortalezas en vista expandida admin: #1D3557
+- [x] Cambiar color del texto de oportunidades en vista expandida admin: #1D3557

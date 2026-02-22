@@ -328,8 +328,8 @@ function AdminInteraccionesView() {
                           {interaction.tasks.map((task: any) => (
                             <View key={task.id} style={{ flexDirection: "row", alignItems: "center", paddingVertical: 4, borderBottomWidth: 0.5, borderBottomColor: colors.border }}>
                               <View style={{ flex: 1 }}>
-                                <Text style={{ fontSize: 13, color: colors.foreground, fontWeight: "600" }}>{task.taskActivity}</Text>
-                                <Text style={{ fontSize: 11, color: colors.muted }}>
+                                <Text style={{ fontSize: 13, color: "#1D3557", fontWeight: "600" }}>{task.taskActivity}</Text>
+                                <Text style={{ fontSize: 11, color: "#4B5563" }}>
                                   {task.documentRoute} · {task.responsibleRole}
                                   {task.ansUndefined ? " · ANS: N/D" : task.ansNumber ? ` · ANS: ${task.ansNumber} ${task.ansType ?? ""}` : ""}
                                 </Text>
@@ -376,7 +376,7 @@ function AdminInteraccionesView() {
                               <Text style={{ fontSize: 11, color: s.type === "fortaleza" ? "#22C55E" : "#F59E0B", fontWeight: "700", marginRight: 6 }}>
                                 {s.type === "fortaleza" ? "F" : "O"}
                               </Text>
-                              <Text style={{ flex: 1, fontSize: 13, color: colors.foreground }}>{s.description}</Text>
+                              <Text style={{ flex: 1, fontSize: 13, color: "#1D3557" }}>{s.description}</Text>
                               <TouchableOpacity
                                 onPress={() => {
                                   setEditStrengthTarget(s);
