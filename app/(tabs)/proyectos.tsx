@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
 import { ScreenContainer } from "@/components/screen-container";
 import { trpc } from "@/lib/trpc";
 import { useLisRole } from "./_layout";
+import { MaterialIcons } from "@expo/vector-icons";
 
 const LIS_RED = "#E63946";
 const LIS_BLUE = "#1D3557";
@@ -190,11 +191,32 @@ export default function ProyectosScreen() {
   const [impact, setImpact] = useState(3);
   const [difficulty, setDifficulty] = useState(3);
 
+  const [selectedProcessId, setSelectedProcessId] = useState<number | null>(null);
+
   // User sees only their own projects; admin/superadmin see all projects consolidated
   const userQuery = trpc.project.list.useQuery(undefined, { enabled: !isAdmin });
   const adminQuery = trpc.admin.getAllProjects.useQuery(undefined, { enabled: isAdmin });
+  const allAdminProjects = isAdmin ? ((adminQuery.data ?? []) as any[]) : [];
+
+  // Build unique process list for filter dropdown
+  const adminProcesses = useMemo(() => {
+    const seen = new Set<number>();
+    const list: { id: number; name: string }[] = [];
+    for (const p of allAdminProjects) {
+      const pid = p.processId;
+      if (pid && !seen.has(pid)) {
+        seen.add(pid);
+        list.push({ id: pid, name: p.processName || p.areaName || `Proceso ${pid}` });
+      }
+    }
+    return list;
+  }, [allAdminProjects]);
+
   const projectList: Project[] = isAdmin
-    ? ((adminQuery.data ?? []) as any[]).sort((a: any, b: any) => b.subtotal - a.subtotal)
+    ? (selectedProcessId === null
+        ? allAdminProjects
+        : allAdminProjects.filter((p: any) => p.processId === selectedProcessId)
+      ).sort((a: any, b: any) => b.subtotal - a.subtotal)
     : (userQuery.data ?? []) as Project[];
   const isLoading = isAdmin ? adminQuery.isLoading : userQuery.isLoading;
   const refetch = isAdmin ? adminQuery.refetch : userQuery.refetch;
@@ -268,12 +290,18 @@ export default function ProyectosScreen() {
   return (
     <ScreenContainer>
       <View style={styles.header}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Proyectos</Text>
           <Text style={styles.headerSub}>
             {(projectList as Project[]).length} proyecto{(projectList as Project[]).length !== 1 ? "s" : ""} registrado{(projectList as Project[]).length !== 1 ? "s" : ""}
           </Text>
         </View>
+        {isAdmin ? (
+          <View style={styles.adminBadge}>
+            <MaterialIcons name="admin-panel-settings" size={14} color="#FFFFFF" />
+            <Text style={styles.adminBadgeText}>Admin</Text>
+          </View>
+        ) : null}
         {hasNotifications && (
           <View style={styles.notifBadge}>
             <Text style={styles.notifBadgeText}>
@@ -281,10 +309,42 @@ export default function ProyectosScreen() {
             </Text>
           </View>
         )}
-        <TouchableOpacity style={styles.addBtn} onPress={() => { resetForm(); setShowForm(true); }}>
-          <Text style={styles.addBtnText}>+ Agregar</Text>
-        </TouchableOpacity>
+        {!isAdmin && (
+          <TouchableOpacity style={styles.addBtn} onPress={() => { resetForm(); setShowForm(true); }}>
+            <Text style={styles.addBtnText}>+ Agregar</Text>
+          </TouchableOpacity>
+        )}
       </View>
+
+      {/* Admin process filter bar */}
+      {isAdmin && adminProcesses.length > 0 && (
+        <View style={styles.filterBar}>
+          <TouchableOpacity
+            style={[styles.filterBtn, selectedProcessId === null && styles.filterBtnActive]}
+            onPress={() => setSelectedProcessId(null)}
+          >
+            <Text style={[styles.filterBtnText, selectedProcessId === null && styles.filterBtnTextActive]}>
+              Todos ({allAdminProjects.length})
+            </Text>
+          </TouchableOpacity>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+            {adminProcesses.map((p: { id: number; name: string }) => (
+              <TouchableOpacity
+                key={p.id}
+                style={[styles.filterBtn, selectedProcessId === p.id && styles.filterBtnActive]}
+                onPress={() => setSelectedProcessId(p.id)}
+              >
+                <Text
+                  style={[styles.filterBtnText, selectedProcessId === p.id && styles.filterBtnTextActive]}
+                  numberOfLines={1}
+                >
+                  {p.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       {isLoading ? (
         <View style={styles.loadingContainer}>
@@ -760,4 +820,24 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#fff",
   },
+  // Admin styles
+  adminBadge: {
+    flexDirection: "row", alignItems: "center", backgroundColor: "#1B4F9B",
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, gap: 4, marginRight: 8,
+  },
+  adminBadgeText: { fontSize: 11, color: "#FFFFFF", fontWeight: "600" },
+  filterBar: {
+    flexDirection: "row", alignItems: "center",
+    paddingHorizontal: 12, paddingVertical: 8,
+    backgroundColor: "#F9FAFB", borderBottomWidth: 1, borderBottomColor: "#E5E7EB",
+    gap: 6,
+  },
+  filterBtn: {
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16,
+    backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB",
+    marginRight: 4,
+  },
+  filterBtnActive: { backgroundColor: "#1B4F9B", borderColor: "#1B4F9B" },
+  filterBtnText: { fontSize: 11, fontWeight: "600", color: "#6B7280" },
+  filterBtnTextActive: { color: "#FFFFFF" },
 });

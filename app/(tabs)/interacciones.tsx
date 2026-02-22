@@ -4,8 +4,10 @@ import {
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { trpc } from "@/lib/trpc";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLocalSearchParams } from "expo-router";
+import { useLisRole } from "./_layout";
+import { MaterialIcons } from "@expo/vector-icons";
 
 const ANS_TYPES = [
   { value: "dias_calendario", label: "Días Calendario" },
@@ -38,6 +40,140 @@ const EMPTY_TASK: TaskForm = {
   ansCompliance: undefined,
   observations: "",
 };
+
+// ─── Admin View: All Interactions with process filter ────────────────────────
+
+function AdminInteraccionesView() {
+  const allInteractionsQuery = trpc.admin.getAllInteractions.useQuery();
+  const [selectedProcessId, setSelectedProcessId] = useState<number | null>(null);
+  const [activeType, setActiveType] = useState<InteractionType>("proveedor");
+
+  const allData = allInteractionsQuery.data ?? [];
+
+  const filteredData = useMemo(() => {
+    const byProcess = selectedProcessId === null ? allData : allData.filter(p => p.processId === selectedProcessId);
+    return byProcess.map(p => ({
+      ...p,
+      interactions: p.interactions.filter((i: any) => i.type === activeType),
+    })).filter(p => p.interactions.length > 0);
+  }, [allData, selectedProcessId, activeType]);
+
+  const typeConfig = {
+    proveedor: { label: "Proveedores", icon: "📦", color: "#F5A623" },
+    cliente: { label: "Clientes", icon: "🤝", color: "#6366F1" },
+  };
+
+  if (allInteractionsQuery.isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#CC2229" />
+        <Text style={styles.loadingText}>Cargando interacciones de todos los procesos...</Text>
+      </View>
+    );
+  }
+
+  if (allData.length === 0) {
+    return (
+      <View style={styles.emptyState}>
+        <Text style={styles.emptyIcon}>🔗</Text>
+        <Text style={styles.emptyTitle}>Sin interacciones registradas</Text>
+        <Text style={styles.emptyText}>Ningún líder de área ha registrado interacciones aún.</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      {/* Type Tabs */}
+      <View style={styles.typeTabs}>
+        {(["proveedor", "cliente"] as InteractionType[]).map(type => (
+          <TouchableOpacity
+            key={type}
+            style={[styles.typeTab, activeType === type && styles.typeTabActive]}
+            onPress={() => setActiveType(type)}
+          >
+            <Text style={styles.typeTabIcon}>{typeConfig[type].icon}</Text>
+            <Text style={[styles.typeTabText, activeType === type && styles.typeTabTextActive]}>
+              {typeConfig[type].label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Filter Bar */}
+      <View style={styles.filterBar}>
+        <TouchableOpacity
+          style={[styles.filterBtn, selectedProcessId === null && styles.filterBtnActive]}
+          onPress={() => setSelectedProcessId(null)}
+        >
+          <Text style={[styles.filterBtnText, selectedProcessId === null && styles.filterBtnTextActive]}>
+            Todos ({allData.length})
+          </Text>
+        </TouchableOpacity>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+          {allData.map(p => (
+            <TouchableOpacity
+              key={p.processId}
+              style={[styles.filterBtn, selectedProcessId === p.processId && styles.filterBtnActive]}
+              onPress={() => setSelectedProcessId(p.processId)}
+            >
+              <Text
+                style={[styles.filterBtnText, selectedProcessId === p.processId && styles.filterBtnTextActive]}
+                numberOfLines={1}
+              >
+                {p.processName || p.areaName}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      <ScrollView style={{ flex: 1, padding: 16 }} showsVerticalScrollIndicator={false}>
+        {filteredData.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyIcon}>{typeConfig[activeType].icon}</Text>
+            <Text style={styles.emptyTitle}>Sin {typeConfig[activeType].label.toLowerCase()}</Text>
+            <Text style={styles.emptyText}>No hay {typeConfig[activeType].label.toLowerCase()} registrados para el filtro seleccionado.</Text>
+          </View>
+        ) : (
+          filteredData.map(processGroup => (
+            <View key={processGroup.processId} style={styles.processBlock}>
+              <View style={styles.processBlockHeader}>
+                <MaterialIcons name="business" size={18} color="#FFFFFF" />
+                <View style={{ flex: 1, marginLeft: 8 }}>
+                  <Text style={styles.processBlockTitle}>{processGroup.processName || processGroup.areaName}</Text>
+                  {processGroup.leaderName ? (
+                    <Text style={styles.processBlockLeader}>Líder: {processGroup.leaderName}</Text>
+                  ) : null}
+                </View>
+                <View style={styles.kpiCountBadge}>
+                  <Text style={styles.kpiCountBadgeText}>{processGroup.interactions.length}</Text>
+                </View>
+              </View>
+              {processGroup.interactions.map((interaction: any) => (
+                <View key={interaction.id} style={styles.adminInteractionCard}>
+                  <View style={[styles.adminInteractionDot, { backgroundColor: typeConfig[activeType].color }]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.adminInteractionName}>{interaction.relatedProcessName}</Text>
+                    {interaction.tasks?.length > 0 && (
+                      <Text style={styles.adminInteractionMeta}>{interaction.tasks.length} tarea{interaction.tasks.length !== 1 ? "s" : ""}</Text>
+                    )}
+                    {interaction.strengths?.length > 0 && (
+                      <Text style={styles.adminInteractionMeta}>{interaction.strengths.length} fortaleza{interaction.strengths.length !== 1 ? "s" : ""}/oportunidad{interaction.strengths.length !== 1 ? "es" : ""}</Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+          ))
+        )}
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </View>
+  );
+}
+
+// ─── User View: Own Interactions ──────────────────────────────────────────────
 
 export default function InteraccionesScreen() {
   const params = useLocalSearchParams<{ type?: string }>();
@@ -146,6 +282,27 @@ export default function InteraccionesScreen() {
   };
 
   const config = typeConfig[activeType];
+
+  const lisRole = useLisRole();
+  const isAdmin = lisRole === "admin" || lisRole === "superadmin";
+
+  if (isAdmin) {
+    return (
+      <ScreenContainer containerClassName="bg-background">
+        <View style={[styles.header, { flexDirection: "row", alignItems: "center", justifyContent: "space-between" }]}>
+          <View>
+            <Text style={styles.headerTitle}>Interacciones del Proceso</Text>
+            <Text style={styles.headerSubtitle}>Vista administrador — todos los procesos</Text>
+          </View>
+          <View style={styles.adminBadge}>
+            <MaterialIcons name="admin-panel-settings" size={14} color="#FFFFFF" />
+            <Text style={styles.adminBadgeText}>Admin</Text>
+          </View>
+        </View>
+        <AdminInteraccionesView />
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer containerClassName="bg-background">
@@ -544,4 +701,51 @@ const styles = StyleSheet.create({
   cancelModalText: { color: "#6B7280", fontWeight: "600", fontSize: 15 },
   saveModalBtn: { flex: 1, backgroundColor: "#CC2229", paddingVertical: 13, borderRadius: 10, alignItems: "center" },
   saveModalText: { color: "#FFF", fontWeight: "700", fontSize: 15 },
+  // Admin styles
+  adminBadge: {
+    flexDirection: "row", alignItems: "center", backgroundColor: "#1B4F9B",
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, gap: 4,
+  },
+  adminBadgeText: { fontSize: 11, color: "#FFFFFF", fontWeight: "600" },
+  filterBar: {
+    flexDirection: "row", alignItems: "center",
+    paddingHorizontal: 12, paddingVertical: 8,
+    backgroundColor: "#F9FAFB", borderBottomWidth: 1, borderBottomColor: "#E5E7EB",
+    gap: 6,
+  },
+  filterBtn: {
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16,
+    backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB",
+    marginRight: 4,
+  },
+  filterBtnActive: { backgroundColor: "#CC2229", borderColor: "#CC2229" },
+  filterBtnText: { fontSize: 11, fontWeight: "600", color: "#6B7280" },
+  filterBtnTextActive: { color: "#FFFFFF" },
+  processBlock: {
+    marginBottom: 16, borderRadius: 12, overflow: "hidden",
+    borderWidth: 1, borderColor: "#E5E7EB",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 3, elevation: 2,
+    backgroundColor: "#FFFFFF",
+  },
+  processBlockHeader: {
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: "#1B4F9B", paddingHorizontal: 14, paddingVertical: 10,
+  },
+  processBlockTitle: { fontSize: 14, fontWeight: "700", color: "#FFFFFF" },
+  processBlockLeader: { fontSize: 11, color: "#BFD4F7", marginTop: 2 },
+  kpiCountBadge: {
+    backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10,
+  },
+  kpiCountBadgeText: { fontSize: 11, color: "#FFFFFF", fontWeight: "700" },
+  adminInteractionCard: {
+    flexDirection: "row", alignItems: "flex-start",
+    paddingHorizontal: 14, paddingVertical: 10,
+    borderBottomWidth: 1, borderBottomColor: "#F3F4F6",
+  },
+  adminInteractionDot: { width: 10, height: 10, borderRadius: 5, marginRight: 10, marginTop: 4 },
+  adminInteractionName: { fontSize: 14, fontWeight: "600", color: "#1A1A2E" },
+  adminInteractionMeta: { fontSize: 12, color: "#6B7280", marginTop: 2 },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12 },
+  loadingText: { fontSize: 14, color: "#6B7280" },
 });

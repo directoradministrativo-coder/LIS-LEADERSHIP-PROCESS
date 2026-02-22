@@ -1362,3 +1362,123 @@ export async function getUserProgress(userId: number) {
     totalCount: 6,
   };
 }
+
+// ─── Admin: All KPIs across all processes ────────────────────────────────────
+
+export async function getAllKPIs() {
+  const db = await getDb();
+  if (!db) return [];
+
+  const allProcesses = await db.select().from(processes);
+  const result = [];
+
+  for (const process of allProcesses) {
+    const user = await db.select().from(users).where(eq(users.id, process.userId)).limit(1);
+    const authUser = user.length > 0 && user[0].email
+      ? await db.select().from(authorizedUsers).where(eq(authorizedUsers.email, user[0].email)).limit(1)
+      : [];
+    const kpiList = await db.select().from(kpis).where(eq(kpis.processId, process.id));
+
+    if (kpiList.length === 0) continue;
+
+    result.push({
+      processId: process.id,
+      processName: process.processName ?? "",
+      areaName: process.areaName ?? authUser[0]?.areaName ?? "",
+      leaderName: authUser[0]?.name ?? user[0]?.name ?? "",
+      kpis: kpiList,
+    });
+  }
+
+  return result;
+}
+
+// ─── Admin: All DOFA across all processes ────────────────────────────────────
+
+export async function getAllDofa() {
+  const db = await getDb();
+  if (!db) return [];
+
+  const allProcesses = await db.select().from(processes);
+  const result = [];
+
+  for (const process of allProcesses) {
+    const user = await db.select().from(users).where(eq(users.id, process.userId)).limit(1);
+    const authUser = user.length > 0 && user[0].email
+      ? await db.select().from(authorizedUsers).where(eq(authorizedUsers.email, user[0].email)).limit(1)
+      : [];
+    const dofaRow = await db.select().from(dofaMatrix).where(eq(dofaMatrix.processId, process.id)).limit(1);
+
+    if (dofaRow.length === 0) continue;
+
+    result.push({
+      processId: process.id,
+      processName: process.processName ?? "",
+      areaName: process.areaName ?? authUser[0]?.areaName ?? "",
+      leaderName: authUser[0]?.name ?? user[0]?.name ?? "",
+      dofa: {
+        ...dofaRow[0],
+        debilidades: JSON.parse(dofaRow[0].debilidades || "[]") as string[],
+        oportunidades: JSON.parse(dofaRow[0].oportunidades || "[]") as string[],
+        fortalezas: JSON.parse(dofaRow[0].fortalezas || "[]") as string[],
+        amenazas: JSON.parse(dofaRow[0].amenazas || "[]") as string[],
+      },
+    });
+  }
+
+  return result;
+}
+
+// ─── Admin: All Interactions across all processes ─────────────────────────────
+
+export async function getAllInteractions() {
+  const db = await getDb();
+  if (!db) return [];
+
+  const allProcesses = await db.select().from(processes);
+  const result = [];
+
+  for (const process of allProcesses) {
+    const user = await db.select().from(users).where(eq(users.id, process.userId)).limit(1);
+    const authUser = user.length > 0 && user[0].email
+      ? await db.select().from(authorizedUsers).where(eq(authorizedUsers.email, user[0].email)).limit(1)
+      : [];
+    const interactions = await db.select().from(processInteractions).where(eq(processInteractions.processId, process.id));
+
+    if (interactions.length === 0) continue;
+
+    // Load tasks and strengths for each interaction
+    const interactionsWithDetails = await Promise.all(interactions.map(async (interaction) => {
+      const tasks = await db.select().from(interactionTasks).where(eq(interactionTasks.interactionId, interaction.id));
+      const strengths = await db.select().from(interactionStrengths).where(eq(interactionStrengths.interactionId, interaction.id));
+      return { ...interaction, tasks, strengths };
+    }));
+
+    result.push({
+      processId: process.id,
+      processName: process.processName ?? "",
+      areaName: process.areaName ?? authUser[0]?.areaName ?? "",
+      leaderName: authUser[0]?.name ?? user[0]?.name ?? "",
+      interactions: interactionsWithDetails,
+    });
+  }
+
+  return result;
+}
+
+// ─── Admin: List all process names for filter dropdowns ──────────────────────
+
+export async function getAllProcessNames() {
+  const db = await getDb();
+  if (!db) return [];
+
+  const allProcesses = await db.select({
+    id: processes.id,
+    processName: processes.processName,
+    areaName: processes.areaName,
+  }).from(processes);
+
+  return allProcesses
+    .filter(p => p.processName && p.processName.trim() !== "")
+    .map(p => ({ id: p.id, processName: p.processName ?? "", areaName: p.areaName ?? "" }));
+}

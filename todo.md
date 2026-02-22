@@ -315,3 +315,34 @@
 - [x] admin-progreso.tsx: agregar guard lisRole === null para evitar flicker de vista consolidada antes de resolver rol
 - [x] TypeScript: 0 errores
 - [x] Tests: 18/18 passing
+
+## Feature v18 - Permisos definitivos y filtros por proceso
+
+### Tabs ocultos para USER
+- [ ] Verificar que CustomTabBar oculta correctamente: Exportar, Usuarios, Admin Proyectos, Historial para perfil USER
+- [ ] Confirmar que ADMIN y SUPERADMIN ven todos los tabs
+
+### Vista Organigrama diferenciada
+- [ ] USER: solo ve el organigrama de su propio proceso
+- [ ] ADMIN/SUPERADMIN: ven todos los organigramas separados por área
+- [ ] ADMIN/SUPERADMIN: opción de vista integrada (todos los niveles juntos en un solo organigrama)
+
+### Filtro por proceso para ADMIN/SUPERADMIN
+- [ ] KPIs: USER ve solo los suyos; ADMIN/SUPERADMIN ven todos con selector de proceso
+- [ ] DOFA: USER ve solo el suyo; ADMIN/SUPERADMIN ven todos con selector de proceso
+- [ ] Interacciones: USER ve solo las suyas; ADMIN/SUPERADMIN ven todas con selector de proceso
+- [ ] Proyectos: USER ve solo los suyos; ADMIN/SUPERADMIN ven todos con selector de proceso
+- [ ] Progreso Consolidado: ya tiene vista diferenciada, agregar filtro por proceso en vista admin
+
+## Feature v18 - Permisos definitivos por rol (sesión 4)
+- [x] Tabs Exportar, Usuarios, Proy. Admin, Historial: ocultos para USER via CustomTabBar reactivo
+- [x] _layout.tsx: lisRole resuelto completamente ANTES de montar Tabs (no hay flicker)
+- [x] Vista Organigrama: USER solo ve el suyo; ADMIN/SUPERADMIN ven todos por proceso
+- [x] Vista Organigrama admin: toggle "Por Proceso" / "Por Nivel" (vista integrada por niveles)
+- [x] KPIs: USER solo ve los suyos; ADMIN/SUPERADMIN ven todos con filtro por proceso
+- [x] DOFA: USER solo ve los suyos; ADMIN/SUPERADMIN ven todos con filtro por proceso
+- [x] Interacciones: USER solo ve las suyas; ADMIN/SUPERADMIN ven todas con filtro por proceso
+- [x] Proyectos: USER solo ve los suyos; ADMIN/SUPERADMIN ven todos con filtro por proceso
+- [x] Progreso Consolidado: USER solo ve el suyo; ADMIN/SUPERADMIN ven todos con filtro por area/lider
+- [x] TypeScript: 0 errores
+- [x] Tests: 18/18 passing

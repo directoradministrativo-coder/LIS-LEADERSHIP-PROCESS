@@ -150,6 +150,7 @@ export default function AdminProgresoScreen() {
   const isAdmin = lisRole === "admin" || lisRole === "superadmin";
   const [showDeadlineModal, setShowDeadlineModal] = useState(false);
   const [deadlineInput, setDeadlineInput] = useState("");
+  const [filterText, setFilterText] = useState("");
 
   const { data: progressList = [], isLoading, refetch } = trpc.admin.getConsolidatedProgress.useQuery(
     undefined,
@@ -198,12 +199,20 @@ export default function AdminProgresoScreen() {
     ? Math.ceil((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
     : null;
 
-  const totalUsers = (progressList as ProgressEntry[]).length;
-  const completedUsers = (progressList as ProgressEntry[]).filter((e) => e.completedCount === 6).length;
+  const filteredList = filterText.trim()
+    ? (progressList as ProgressEntry[]).filter(
+        (e) =>
+          e.areaName?.toLowerCase().includes(filterText.toLowerCase()) ||
+          e.name?.toLowerCase().includes(filterText.toLowerCase())
+      )
+    : (progressList as ProgressEntry[]);
+
+  const totalUsers = filteredList.length;
+  const completedUsers = filteredList.filter((e) => e.completedCount === 6).length;
   const avgProgress =
     totalUsers > 0
       ? Math.round(
-          (progressList as ProgressEntry[]).reduce((sum, e) => sum + e.completedCount, 0) /
+          filteredList.reduce((sum, e) => sum + e.completedCount, 0) /
             totalUsers
         )
       : 0;
@@ -243,6 +252,23 @@ export default function AdminProgresoScreen() {
         <TouchableOpacity style={styles.deadlineBtn} onPress={openDeadlineModal}>
           <Text style={styles.deadlineBtnText}>📅 Fecha Límite</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* Filter by area/leader */}
+      <View style={styles.searchBar}>
+        <TextInput
+          style={styles.searchInput}
+          value={filterText}
+          onChangeText={setFilterText}
+          placeholder="Filtrar por área o líder..."
+          placeholderTextColor="#9CA3AF"
+          returnKeyType="search"
+        />
+        {filterText.length > 0 && (
+          <TouchableOpacity onPress={() => setFilterText("")} style={styles.searchClear}>
+            <Text style={styles.searchClearText}>✕</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -343,7 +369,7 @@ export default function AdminProgresoScreen() {
               <Text style={[styles.tableHeaderCell, { flex: 1, textAlign: "right" }]}>Último</Text>
             </View>
 
-            {(progressList as ProgressEntry[]).map((entry, index) => {
+            {filteredList.map((entry, index) => {
               const pct = Math.round((entry.completedCount / entry.totalCount) * 100);
               const pctColor = pct === 100 ? LIS_GREEN : pct >= 50 ? LIS_YELLOW : pct > 0 ? LIS_ORANGE : LIS_RED;
 
@@ -763,5 +789,35 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     color: "#fff",
+  },
+  // Search / filter bar
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "#F9FAFB",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  searchInput: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    color: "#111827",
+  },
+  searchClear: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  searchClearText: {
+    fontSize: 16,
+    color: "#9CA3AF",
+    fontWeight: "600",
   },
 });

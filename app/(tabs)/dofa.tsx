@@ -4,7 +4,9 @@ import {
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { trpc } from "@/lib/trpc";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useLisRole } from "./_layout";
+import { MaterialIcons } from "@expo/vector-icons";
 
 const DOFA_SECTIONS = [
   {
@@ -56,7 +58,127 @@ type DofaData = {
   amenazas: string[];
 };
 
-export default function DofaScreen() {
+// ─── Admin View: All DOFA with process filter ─────────────────────────────────
+
+function AdminDofaView() {
+  const allDofaQuery = trpc.admin.getAllDofa.useQuery();
+  const [selectedProcessId, setSelectedProcessId] = useState<number | null>(null);
+
+  const allData = allDofaQuery.data ?? [];
+
+  const filteredData = useMemo(() => {
+    if (selectedProcessId === null) return allData;
+    return allData.filter(p => p.processId === selectedProcessId);
+  }, [allData, selectedProcessId]);
+
+  if (allDofaQuery.isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#CC2229" />
+        <Text style={styles.loadingText}>Cargando DOFA de todos los procesos...</Text>
+      </View>
+    );
+  }
+
+  if (allData.length === 0) {
+    return (
+      <View style={styles.emptyState}>
+        <Text style={styles.emptyIcon}>🔍</Text>
+        <Text style={styles.emptyTitle}>Sin análisis DOFA registrados</Text>
+        <Text style={styles.emptyText}>Ningún líder de área ha completado su análisis DOFA aún.</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      {/* Filter Bar */}
+      <View style={styles.filterBar}>
+        <TouchableOpacity
+          style={[styles.filterBtn, selectedProcessId === null && styles.filterBtnActive]}
+          onPress={() => setSelectedProcessId(null)}
+        >
+          <Text style={[styles.filterBtnText, selectedProcessId === null && styles.filterBtnTextActive]}>
+            Todos ({allData.length})
+          </Text>
+        </TouchableOpacity>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+          {allData.map(p => (
+            <TouchableOpacity
+              key={p.processId}
+              style={[styles.filterBtn, selectedProcessId === p.processId && styles.filterBtnActive]}
+              onPress={() => setSelectedProcessId(p.processId)}
+            >
+              <Text
+                style={[styles.filterBtnText, selectedProcessId === p.processId && styles.filterBtnTextActive]}
+                numberOfLines={1}
+              >
+                {p.processName || p.areaName}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      <ScrollView style={{ flex: 1, padding: 16 }} showsVerticalScrollIndicator={false}>
+        {filteredData.map(processGroup => (
+          <View key={processGroup.processId} style={styles.processBlock}>
+            {/* Process Header */}
+            <View style={styles.processBlockHeader}>
+              <MaterialIcons name="business" size={18} color="#FFFFFF" />
+              <View style={{ flex: 1, marginLeft: 8 }}>
+                <Text style={styles.processBlockTitle}>{processGroup.processName || processGroup.areaName}</Text>
+                {processGroup.leaderName ? (
+                  <Text style={styles.processBlockLeader}>Líder: {processGroup.leaderName}</Text>
+                ) : null}
+              </View>
+              {/* Summary counts */}
+              <View style={styles.dofaSummaryRow}>
+                {DOFA_SECTIONS.map(s => (
+                  <View key={s.key} style={[styles.dofaSummaryBadge, { backgroundColor: s.color }]}>
+                    <Text style={styles.dofaSummaryBadgeText}>
+                      {processGroup.dofa[s.key]?.length ?? 0}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* DOFA Sections */}
+            {DOFA_SECTIONS.map(section => {
+              const items = processGroup.dofa[section.key] ?? [];
+              if (items.length === 0) return null;
+              return (
+                <View key={section.key} style={[styles.dofaSectionCard, { borderLeftColor: section.color }]}>
+                  <View style={[styles.dofaSectionHeader, { backgroundColor: section.bgColor }]}>
+                    <Text style={styles.dofaSectionIcon}>{section.icon}</Text>
+                    <Text style={[styles.dofaSectionTitle, { color: section.color }]}>{section.label}</Text>
+                    <View style={[styles.countBadge, { backgroundColor: section.color }]}>
+                      <Text style={styles.countBadgeText}>{items.length}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.dofaItemsList}>
+                    {items.map((item, idx) => (
+                      <View key={idx} style={styles.dofaItemRow}>
+                        <View style={[styles.itemBullet, { backgroundColor: section.color }]} />
+                        <Text style={styles.itemText}>{item}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ))}
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </View>
+  );
+}
+
+// ─── User View: Own DOFA ──────────────────────────────────────────────────────
+
+function UserDofaView() {
   const [data, setData] = useState<DofaData>({
     debilidades: [],
     oportunidades: [],
@@ -136,24 +258,7 @@ export default function DofaScreen() {
   const totalItems = Object.values(data).reduce((sum, arr) => sum + arr.length, 0);
 
   return (
-    <ScreenContainer containerClassName="bg-background">
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>Análisis DOFA</Text>
-          <Text style={styles.headerSubtitle}>Diagnóstico estratégico del proceso</Text>
-        </View>
-        {hasChanges && (
-          <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={isSaving}>
-            {isSaving ? (
-              <ActivityIndicator size="small" color="#FFF" />
-            ) : (
-              <Text style={styles.saveBtnText}>Guardar</Text>
-            )}
-          </TouchableOpacity>
-        )}
-      </View>
-
+    <>
       {/* Summary Banner */}
       {totalItems > 0 && (
         <View style={styles.summaryBanner}>
@@ -263,6 +368,35 @@ export default function DofaScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+    </>
+  );
+}
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
+
+export default function DofaScreen() {
+  const lisRole = useLisRole();
+  const isAdmin = lisRole === "admin" || lisRole === "superadmin";
+
+  return (
+    <ScreenContainer containerClassName="bg-background">
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <Text style={styles.headerTitle}>Análisis DOFA</Text>
+          <Text style={styles.headerSubtitle}>
+            {isAdmin ? "Vista administrador — todos los procesos" : "Diagnóstico estratégico del proceso"}
+          </Text>
+        </View>
+        {isAdmin ? (
+          <View style={styles.adminBadge}>
+            <MaterialIcons name="admin-panel-settings" size={14} color="#FFFFFF" />
+            <Text style={styles.adminBadgeText}>Admin</Text>
+          </View>
+        ) : null}
+      </View>
+
+      {isAdmin ? <AdminDofaView /> : <UserDofaView />}
     </ScreenContainer>
   );
 }
@@ -276,8 +410,56 @@ const styles = StyleSheet.create({
   headerLeft: { flex: 1 },
   headerTitle: { fontSize: 18, fontWeight: "800", color: "#1A1A2E" },
   headerSubtitle: { fontSize: 12, color: "#6B7280", marginTop: 2 },
+  adminBadge: {
+    flexDirection: "row", alignItems: "center", backgroundColor: "#1B4F9B",
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, gap: 4,
+  },
+  adminBadgeText: { fontSize: 11, color: "#FFFFFF", fontWeight: "600" },
   saveBtn: { backgroundColor: "#5CB85C", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, minWidth: 80, alignItems: "center" },
   saveBtnText: { color: "#FFF", fontWeight: "700", fontSize: 13 },
+  // Filter bar
+  filterBar: {
+    flexDirection: "row", alignItems: "center",
+    paddingHorizontal: 12, paddingVertical: 8,
+    backgroundColor: "#F9FAFB", borderBottomWidth: 1, borderBottomColor: "#E5E7EB",
+    gap: 6,
+  },
+  filterBtn: {
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16,
+    backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: "#E5E7EB",
+    marginRight: 4,
+  },
+  filterBtnActive: { backgroundColor: "#CC2229", borderColor: "#CC2229" },
+  filterBtnText: { fontSize: 11, fontWeight: "600", color: "#6B7280" },
+  filterBtnTextActive: { color: "#FFFFFF" },
+  // Process block
+  processBlock: {
+    marginBottom: 20, borderRadius: 12, overflow: "hidden",
+    borderWidth: 1, borderColor: "#E5E7EB",
+    shadowColor: "#000", shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 3, elevation: 2,
+    backgroundColor: "#FFFFFF",
+  },
+  processBlockHeader: {
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: "#1B4F9B", paddingHorizontal: 14, paddingVertical: 10,
+  },
+  processBlockTitle: { fontSize: 14, fontWeight: "700", color: "#FFFFFF" },
+  processBlockLeader: { fontSize: 11, color: "#BFD4F7", marginTop: 2 },
+  dofaSummaryRow: { flexDirection: "row", gap: 4 },
+  dofaSummaryBadge: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  dofaSummaryBadgeText: { fontSize: 10, color: "#FFFFFF", fontWeight: "700" },
+  // Admin DOFA section card
+  dofaSectionCard: {
+    borderLeftWidth: 3, marginHorizontal: 12, marginBottom: 8, borderRadius: 8,
+    overflow: "hidden", backgroundColor: "#FAFAFA",
+  },
+  dofaSectionHeader: { flexDirection: "row", alignItems: "center", padding: 10, gap: 8 },
+  dofaSectionIcon: { fontSize: 18 },
+  dofaSectionTitle: { flex: 1, fontSize: 13, fontWeight: "700" },
+  dofaItemsList: { paddingHorizontal: 12, paddingBottom: 10 },
+  dofaItemRow: { flexDirection: "row", alignItems: "flex-start", paddingVertical: 4 },
+  // Summary banner (user view)
   summaryBanner: {
     flexDirection: "row", backgroundColor: "#FFFFFF",
     borderBottomWidth: 1, borderBottomColor: "#E5E7EB", paddingVertical: 10,
@@ -286,6 +468,12 @@ const styles = StyleSheet.create({
   summaryCount: { fontSize: 22, fontWeight: "800" },
   summaryLabel: { fontSize: 10, color: "#6B7280", fontWeight: "600", textTransform: "uppercase" },
   content: { flex: 1, padding: 16 },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12 },
+  loadingText: { fontSize: 14, color: "#6B7280" },
+  emptyState: { alignItems: "center", paddingTop: 60 },
+  emptyIcon: { fontSize: 48, marginBottom: 12 },
+  emptyTitle: { fontSize: 18, fontWeight: "700", color: "#1A1A2E", marginBottom: 6 },
+  emptyText: { fontSize: 14, color: "#6B7280", textAlign: "center", paddingHorizontal: 32 },
   sectionCard: {
     backgroundColor: "#FFFFFF", borderRadius: 12, marginBottom: 16,
     borderWidth: 1, overflow: "hidden",
@@ -318,37 +506,20 @@ const styles = StyleSheet.create({
   },
   bottomSaveBtnText: { color: "#FFF", fontWeight: "700", fontSize: 16 },
   observationsCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    padding: 14,
-    marginBottom: 12,
+    backgroundColor: "#FFFFFF", borderRadius: 12, borderWidth: 1,
+    borderColor: "#E5E7EB", padding: 14, marginBottom: 12,
   },
   observationsLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#6B7280",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 8,
+    fontSize: 12, fontWeight: "700", color: "#6B7280",
+    textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8,
   },
   observationsInput: {
-    borderWidth: 1.5,
-    borderColor: "#E5E7EB",
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 14,
-    color: "#1A1A2E",
-    minHeight: 80,
+    borderWidth: 1.5, borderColor: "#E5E7EB", borderRadius: 8,
+    padding: 10, fontSize: 14, color: "#1A1A2E", minHeight: 80,
   },
   saveErrorBox: {
-    backgroundColor: "#FEF2F2",
-    borderWidth: 1,
-    borderColor: "#FECACA",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
+    backgroundColor: "#FEF2F2", borderWidth: 1, borderColor: "#FECACA",
+    borderRadius: 8, padding: 12, marginBottom: 12,
   },
   saveErrorText: { fontSize: 13, color: "#CC2229", fontWeight: "600" },
 });

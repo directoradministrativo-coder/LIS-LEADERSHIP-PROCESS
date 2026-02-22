@@ -112,8 +112,17 @@ function OrgNode({
 
 // ─── Admin: All Processes Org Chart ──────────────────────────────────────────
 
+const LEVEL_LABELS: Record<number, { label: string; color: string }> = {
+  1: { label: "Nivel 1 — Dirección", color: "#CC2229" },
+  2: { label: "Nivel 2 — Gerencia", color: "#1B4F9B" },
+  3: { label: "Nivel 3 — Coordinación", color: "#F5A623" },
+  4: { label: "Nivel 4 — Análisis", color: "#5CB85C" },
+  5: { label: "Nivel 5 — Auxiliar", color: "#6C757D" },
+};
+
 function AdminOrgView() {
   const allProcessesQuery = trpc.admin.getAllProcesses.useQuery();
+  const [viewMode, setViewMode] = useState<"separado" | "integrado">("separado");
 
   if (allProcessesQuery.isLoading) {
     return (
@@ -136,42 +145,121 @@ function AdminOrgView() {
     );
   }
 
+  // Build integrated view: group all hierarchies by level across all processes
+  const byLevel = useMemo(() => {
+    const map: Record<number, { processName: string; areaName: string; hierarchy: any; collaborators: any[] }[]> = {};
+    for (const { process, hierarchies, collaborators } of processesData) {
+      for (const h of hierarchies) {
+        if (!map[h.level]) map[h.level] = [];
+        map[h.level].push({
+          processName: process.processName ?? "",
+          areaName: process.areaName ?? "",
+          hierarchy: h,
+          collaborators,
+        });
+      }
+    }
+    return map;
+  }, [processesData]);
+
+  const levelKeys = Object.keys(byLevel).map(Number).sort((a, b) => a - b);
+
   return (
-    <ScrollView style={styles.adminScrollView} showsVerticalScrollIndicator={false}>
-      {processesData.map(({ process, user, hierarchies, collaborators }) => {
-        if (!process.processName || hierarchies.length === 0) return null;
-        const sortedHierarchies = [...hierarchies].sort((a, b) => a.level - b.level);
-        return (
-          <View key={process.id} style={styles.processBlock}>
-            <View style={styles.processBlockHeader}>
-              <View style={styles.processBlockIcon}>
-                <MaterialIcons name="business" size={20} color="#FFFFFF" />
+    <View style={{ flex: 1 }}>
+      {/* View Mode Toggle */}
+      <View style={styles.viewModeBar}>
+        <TouchableOpacity
+          style={[styles.viewModeBtn, viewMode === "separado" && styles.viewModeBtnActive]}
+          onPress={() => setViewMode("separado")}
+        >
+          <MaterialIcons name="view-agenda" size={16} color={viewMode === "separado" ? "#FFFFFF" : "#6B7280"} />
+          <Text style={[styles.viewModeBtnText, viewMode === "separado" && styles.viewModeBtnTextActive]}>
+            Por Proceso
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.viewModeBtn, viewMode === "integrado" && styles.viewModeBtnActive]}
+          onPress={() => setViewMode("integrado")}
+        >
+          <MaterialIcons name="layers" size={16} color={viewMode === "integrado" ? "#FFFFFF" : "#6B7280"} />
+          <Text style={[styles.viewModeBtnText, viewMode === "integrado" && styles.viewModeBtnTextActive]}>
+            Por Nivel
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {viewMode === "separado" ? (
+        <ScrollView style={styles.adminScrollView} showsVerticalScrollIndicator={false}>
+          {processesData.map(({ process, user, hierarchies, collaborators }) => {
+            if (!process.processName || hierarchies.length === 0) return null;
+            const sortedHierarchies = [...hierarchies].sort((a, b) => a.level - b.level);
+            return (
+              <View key={process.id} style={styles.processBlock}>
+                <View style={styles.processBlockHeader}>
+                  <View style={styles.processBlockIcon}>
+                    <MaterialIcons name="business" size={20} color="#FFFFFF" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.processBlockTitle}>{process.processName}</Text>
+                    {process.areaName && (
+                      <Text style={styles.processBlockArea}>{process.areaName}</Text>
+                    )}
+                    {user && (
+                      <Text style={styles.processBlockUser}>Líder: {user.name ?? user.email}</Text>
+                    )}
+                  </View>
+                </View>
+                <View style={styles.processBlockContent}>
+                  {sortedHierarchies.map(h => (
+                    <OrgNode
+                      key={h.id}
+                      hierarchy={h}
+                      collaborators={collaborators as Collaborator[]}
+                      allFunctions={[]}
+                      depth={h.level}
+                    />
+                  ))}
+                </View>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.processBlockTitle}>{process.processName}</Text>
-                {process.areaName && (
-                  <Text style={styles.processBlockArea}>{process.areaName}</Text>
-                )}
-                {user && (
-                  <Text style={styles.processBlockUser}>Líder: {user.name ?? user.email}</Text>
-                )}
+            );
+          })}
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      ) : (
+        <ScrollView style={styles.adminScrollView} showsVerticalScrollIndicator={false}>
+          {levelKeys.map(level => {
+            const cfg = LEVEL_LABELS[level] ?? { label: `Nivel ${level}`, color: "#6C757D" };
+            return (
+              <View key={level} style={styles.levelBlock}>
+                <View style={[styles.levelBlockHeader, { backgroundColor: cfg.color }]}>
+                  <MaterialIcons name="layers" size={18} color="#FFFFFF" />
+                  <Text style={styles.levelBlockTitle}>{cfg.label}</Text>
+                  <View style={styles.levelCountBadge}>
+                    <Text style={styles.levelCountText}>{byLevel[level].length} cargos</Text>
+                  </View>
+                </View>
+                {byLevel[level].map((item, idx) => (
+                  <View key={idx} style={styles.integratedRow}>
+                    <View style={[styles.integratedProcessTag, { borderLeftColor: cfg.color }]}>
+                      <Text style={styles.integratedProcessName} numberOfLines={1}>
+                        {item.processName || item.areaName}
+                      </Text>
+                    </View>
+                    <OrgNode
+                      hierarchy={item.hierarchy}
+                      collaborators={item.collaborators as Collaborator[]}
+                      allFunctions={[]}
+                      depth={0}
+                    />
+                  </View>
+                ))}
               </View>
-            </View>
-            <View style={styles.processBlockContent}>
-              {sortedHierarchies.map(h => (
-                <OrgNode
-                  key={h.id}
-                  hierarchy={h}
-                  collaborators={collaborators as Collaborator[]}
-                  allFunctions={[]}
-                  depth={h.level}
-                />
-              ))}
-            </View>
-          </View>
-        );
-      })}
-    </ScrollView>
+            );
+          })}
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      )}
+    </View>
   );
 }
 
@@ -579,5 +667,94 @@ const styles = StyleSheet.create({
   },
   processBlockContent: {
     padding: 12,
+  },
+  // View mode toggle
+  viewModeBar: {
+    flexDirection: "row",
+    padding: 8,
+    gap: 8,
+    backgroundColor: "#F9FAFB",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  viewModeBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: "#F3F4F6",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  viewModeBtnActive: {
+    backgroundColor: "#1B4F9B",
+    borderColor: "#1B4F9B",
+  },
+  viewModeBtnText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#6B7280",
+  },
+  viewModeBtnTextActive: {
+    color: "#FFFFFF",
+  },
+  // Integrated view
+  levelBlock: {
+    marginBottom: 16,
+    borderRadius: 12,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  levelBlockHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  levelBlockTitle: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  levelCountBadge: {
+    backgroundColor: "rgba(255,255,255,0.25)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  levelCountText: {
+    fontSize: 11,
+    color: "#FFFFFF",
+    fontWeight: "700",
+  },
+  integratedRow: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  integratedProcessTag: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 4,
+    borderLeftWidth: 3,
+    backgroundColor: "#F9FAFB",
+  },
+  integratedProcessName: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#6B7280",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
 });

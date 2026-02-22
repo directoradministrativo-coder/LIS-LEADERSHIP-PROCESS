@@ -301,6 +301,26 @@ export const appRouter = router({
       if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
       return db.getConsolidatedProgress();
     }),
+    // Get all KPIs across all processes (admin only)
+    getAllKPIs: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
+      return db.getAllKPIs();
+    }),
+    // Get all DOFA across all processes (admin only)
+    getAllDofa: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
+      return db.getAllDofa();
+    }),
+    // Get all Interactions across all processes (admin only)
+    getAllInteractions: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
+      return db.getAllInteractions();
+    }),
+    // Get all process names for filter dropdowns (admin only)
+    getAllProcessNames: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
+      return db.getAllProcessNames();
+    }),
   }),
 
   // Check if user is authorized (public - called after OAuth login)

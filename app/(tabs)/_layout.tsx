@@ -33,23 +33,23 @@ const TAB_DEFS: {
   icon: string;
   adminOnly?: boolean;
 }[] = [
-  { name: "index",            title: "Inicio",       icon: "home" },
-  { name: "organigrama",      title: "Organigrama",  icon: "account-tree" },
-  { name: "organigrama-visual", title: "Vista Org.", icon: "hub" },
-  { name: "kpis",             title: "KPIs",         icon: "bar-chart" },
-  { name: "dofa",             title: "DOFA",         icon: "search" },
-  { name: "interacciones",    title: "Interacciones",icon: "swap-horiz" },
-  { name: "proyectos",        title: "Proyectos",    icon: "rocket-launch" },
-  { name: "admin-progreso",   title: "Progreso",     icon: "leaderboard" },
-  { name: "exportar",         title: "Exportar",     icon: "download",          adminOnly: true },
-  { name: "admin-usuarios",   title: "Usuarios",     icon: "manage-accounts",   adminOnly: true },
-  { name: "admin-proyectos",  title: "Proy. Admin",  icon: "assignment",        adminOnly: true },
-  { name: "admin-historial",  title: "Historial",    icon: "history",           adminOnly: true },
+  { name: "index",             title: "Inicio",       icon: "home" },
+  { name: "organigrama",       title: "Organigrama",  icon: "account-tree" },
+  { name: "organigrama-visual",title: "Vista Org.",   icon: "hub" },
+  { name: "kpis",              title: "KPIs",         icon: "bar-chart" },
+  { name: "dofa",              title: "DOFA",         icon: "search" },
+  { name: "interacciones",     title: "Interacciones",icon: "swap-horiz" },
+  { name: "proyectos",         title: "Proyectos",    icon: "rocket-launch" },
+  { name: "admin-progreso",    title: "Progreso",     icon: "leaderboard" },
+  // Admin-only tabs — hidden for "user" role
+  { name: "exportar",          title: "Exportar",     icon: "download",        adminOnly: true },
+  { name: "admin-usuarios",    title: "Usuarios",     icon: "manage-accounts", adminOnly: true },
+  { name: "admin-proyectos",   title: "Proy. Admin",  icon: "assignment",      adminOnly: true },
+  { name: "admin-historial",   title: "Historial",    icon: "history",         adminOnly: true },
 ];
 
 // ─── Custom Tab Bar ───────────────────────────────────────────────────────────
-// Renders only the tabs that the current role is allowed to see.
-// This is fully reactive: whenever lisRole changes, the bar re-renders.
+// Fully reactive: filters visible tabs on every render based on lisRole.
 function CustomTabBar({
   state,
   navigation,
@@ -59,8 +59,9 @@ function CustomTabBar({
 }: BottomTabBarProps & { lisRole: LisRole; bottomPadding: number; tabBarHeight: number }) {
   const isAdmin = lisRole === "admin" || lisRole === "superadmin";
 
-  // Build a map of route name → index in state.routes
-  const routeMap = Object.fromEntries(state.routes.map((r, i) => [r.name, i]));
+  // Map route name → index in state.routes
+  const routeMap: Record<string, number> = {};
+  state.routes.forEach((r, i) => { routeMap[r.name] = i; });
 
   const visibleTabs = TAB_DEFS.filter((t) => {
     if (t.adminOnly && !isAdmin) return false;
@@ -121,29 +122,30 @@ function CustomTabBar({
   );
 }
 
-// ─── Authorization Gate ───────────────────────────────────────────────────────
-function AuthorizationGate({
-  children,
-  onRoleResolved,
+// ─── Role Resolver ────────────────────────────────────────────────────────────
+// Resolves the LIS role from the DB and calls onResolved.
+// Renders a loading/error screen while resolving.
+function RoleResolver({
+  onResolved,
 }: {
-  children: React.ReactNode;
-  onRoleResolved: (role: LisRole) => void;
+  onResolved: (role: LisRole) => void;
 }) {
   const { user, isAuthenticated, loading, logout } = useAuth();
-  const [authState, setAuthState] = useState<"checking" | "authorized" | "unauthorized">("checking");
-
-  const handleUnauthorizedBack = async () => {
-    try { await logout(); } catch { /* ignore */ }
-    await Storage.removeItem(PROFILE_KEY);
-    await Storage.removeItem(ROLE_KEY);
-    onRoleResolved(null);
-    router.replace("/login" as any);
-  };
 
   const checkAuth = trpc.auth2.checkAuthorization.useQuery(undefined, {
     enabled: isAuthenticated && !loading,
     retry: false,
   });
+
+  const [unauthorized, setUnauthorized] = useState(false);
+
+  const handleUnauthorizedBack = async () => {
+    try { await logout(); } catch { /* ignore */ }
+    await Storage.removeItem(PROFILE_KEY);
+    await Storage.removeItem(ROLE_KEY);
+    onResolved(null);
+    router.replace("/login" as any);
+  };
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -154,23 +156,21 @@ function AuthorizationGate({
       if (checkAuth.data?.authorized) {
         const lisRole = (checkAuth.data.role ?? "user") as LisRole;
         Storage.setItem(ROLE_KEY, lisRole ?? "user");
-        onRoleResolved(lisRole);
 
         if (lisRole === "superadmin") {
           Storage.getItem(PROFILE_KEY).then(savedProfile => {
             if (!savedProfile) {
               router.replace("/select-profile" as any);
             } else {
-              setAuthState("authorized");
+              onResolved(lisRole);
             }
           });
           return;
         }
-        setAuthState("authorized");
+        onResolved(lisRole);
       } else {
         Storage.removeItem(ROLE_KEY);
-        onRoleResolved(null);
-        setAuthState("unauthorized");
+        setUnauthorized(true);
       }
     }
   }, [isAuthenticated, loading, checkAuth.isSuccess, checkAuth.data]);
@@ -184,7 +184,7 @@ function AuthorizationGate({
     );
   }
 
-  if (authState === "unauthorized") {
+  if (unauthorized) {
     return (
       <View style={styles.gateContainer}>
         <View style={styles.colorStrip}>
@@ -214,7 +214,13 @@ function AuthorizationGate({
     );
   }
 
-  return <>{children}</>;
+  // Still resolving (waiting for onResolved to be called)
+  return (
+    <View style={styles.gateContainer}>
+      <ActivityIndicator size="large" color="#CC2229" />
+      <Text style={styles.gateLoadingText}>Cargando perfil...</Text>
+    </View>
+  );
 }
 
 // ─── Tab Layout ───────────────────────────────────────────────────────────────
@@ -224,6 +230,7 @@ export default function TabLayout() {
   const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 8);
   const tabBarHeight = 56 + bottomPadding;
 
+  // lisRole starts as null — Tabs are NOT rendered until it is resolved.
   const [lisRole, setLisRole] = useState<LisRole>(null);
 
   useEffect(() => {
@@ -232,6 +239,7 @@ export default function TabLayout() {
     }
   }, [loading, isAuthenticated]);
 
+  // Show loading while auth state is being determined
   if (loading || (!isAuthenticated && !loading)) {
     return (
       <View style={{ flex: 1, backgroundColor: "#FFFFFF", justifyContent: "center", alignItems: "center" }}>
@@ -248,51 +256,46 @@ export default function TabLayout() {
     );
   }
 
-  // Don't render Tabs until role is resolved so the custom tab bar
-  // has the correct role from the very first render.
+  // Phase 1: Role not yet resolved → show RoleResolver (loading/unauthorized screen)
+  // The RoleResolver calls setLisRole when done, which triggers a re-render into Phase 2.
   if (lisRole === null) {
     return (
-      <LisRoleContext.Provider value={lisRole}>
-        <AuthorizationGate onRoleResolved={setLisRole}>
-          <View style={{ flex: 1, backgroundColor: "#FFFFFF", justifyContent: "center", alignItems: "center" }}>
-            <ActivityIndicator size="large" color="#CC2229" />
-            <Text style={{ marginTop: 12, fontSize: 14, color: "#6B7280" }}>Cargando perfil...</Text>
-          </View>
-        </AuthorizationGate>
+      <LisRoleContext.Provider value={null}>
+        <RoleResolver onResolved={setLisRole} />
       </LisRoleContext.Provider>
     );
   }
 
+  // Phase 2: Role is known → render Tabs with correct CustomTabBar
+  // lisRole is guaranteed non-null here, so CustomTabBar filters correctly from the first render.
   return (
     <LisRoleContext.Provider value={lisRole}>
-      <AuthorizationGate onRoleResolved={setLisRole}>
-        <Tabs
-          tabBar={(props) => (
-            <CustomTabBar
-              {...props}
-              lisRole={lisRole}
-              bottomPadding={bottomPadding}
-              tabBarHeight={tabBarHeight}
-            />
-          )}
-          screenOptions={{
-            headerShown: false,
-          }}
-        >
-          {TAB_DEFS.map((tab) => (
-            <Tabs.Screen
-              key={tab.name}
-              name={tab.name}
-              options={{
-                title: tab.title,
-                tabBarIcon: ({ color, size }) => (
-                  <MaterialIcons name={tab.icon as any} size={size} color={color} />
-                ),
-              }}
-            />
-          ))}
-        </Tabs>
-      </AuthorizationGate>
+      <Tabs
+        tabBar={(props) => (
+          <CustomTabBar
+            {...props}
+            lisRole={lisRole}
+            bottomPadding={bottomPadding}
+            tabBarHeight={tabBarHeight}
+          />
+        )}
+        screenOptions={{
+          headerShown: false,
+        }}
+      >
+        {TAB_DEFS.map((tab) => (
+          <Tabs.Screen
+            key={tab.name}
+            name={tab.name}
+            options={{
+              title: tab.title,
+              tabBarIcon: ({ color, size }) => (
+                <MaterialIcons name={tab.icon as any} size={size} color={color} />
+              ),
+            }}
+          />
+        ))}
+      </Tabs>
     </LisRoleContext.Provider>
   );
 }
