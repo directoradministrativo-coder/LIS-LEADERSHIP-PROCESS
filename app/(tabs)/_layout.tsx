@@ -224,12 +224,35 @@ export default function TabLayout() {
               tabBarIcon: ({ color, size }) => <MaterialIcons name="download" size={size} color={color} />,
             }}
           />
-          {/* Admin-only tab: visible only for admin and superadmin roles */}
+          <Tabs.Screen
+            name="proyectos"
+            options={{
+              title: "Proyectos",
+              tabBarIcon: ({ color, size }) => <MaterialIcons name="rocket-launch" size={size} color={color} />,
+            }}
+          />
+          {/* Admin-only tabs: visible only for admin and superadmin roles */}
           <Tabs.Screen
             name="admin-usuarios"
             options={{
               title: "Usuarios",
               tabBarIcon: ({ color, size }) => <MaterialIcons name="manage-accounts" size={size} color={color} />,
+              href: isAdmin ? undefined : null,
+            }}
+          />
+          <Tabs.Screen
+            name="admin-proyectos"
+            options={{
+              title: "Proy. Admin",
+              tabBarIcon: ({ color, size }) => <MaterialIcons name="assignment" size={size} color={color} />,
+              href: isAdmin ? undefined : null,
+            }}
+          />
+          <Tabs.Screen
+            name="admin-progreso"
+            options={{
+              title: "Progreso",
+              tabBarIcon: ({ color, size }) => <MaterialIcons name="leaderboard" size={size} color={color} />,
               href: isAdmin ? undefined : null,
             }}
           />

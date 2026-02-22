@@ -27,6 +27,11 @@ type InteractionsData = {
   interactions: any[];
 };
 
+type ProjectsData = {
+  process: any;
+  projects: any[];
+};
+
 // ============================================================
 // Helpers
 // ============================================================
@@ -70,7 +75,8 @@ export function buildExcelWorkbook(
   orgData: OrgChartData,
   kpisData: KPIsData,
   dofaData: DofaData,
-  interactionsData: InteractionsData
+  interactionsData: InteractionsData,
+  projectsData?: ProjectsData
 ): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
   const processName = orgData.process?.processName ?? "Sin nombre";
@@ -91,6 +97,7 @@ export function buildExcelWorkbook(
     ["3. Análisis DOFA"],
     ["4. Proveedores del Proceso"],
     ["5. Clientes del Proceso"],
+    ["6. Proyectos del Área"],
   ];
   const wsCover = XLSX.utils.aoa_to_sheet(coverData);
   setColWidths(wsCover, [35, 50]);
@@ -247,6 +254,42 @@ export function buildExcelWorkbook(
   wsClientes["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }];
   setColWidths(wsClientes, [25, 35, 25, 25, 25, 12, 40]);
   XLSX.utils.book_append_sheet(wb, wsClientes, "Clientes");
+
+  // ── Sheet 7: Proyectos ─────────────────────────────────────────────
+  if (projectsData) {
+    const impactLabels = ["", "Muy Bajo", "Bajo", "Medio", "Alto", "Muy Alto"];
+    const difficultyLabels = ["", "Muy Difícil", "Difícil", "Moderado", "Fácil", "Muy Fácil"];
+    const statusLabels: Record<string, string> = {
+      por_priorizar: "Por Priorizar",
+      en_ejecucion: "En Ejecución",
+      finalizado: "Finalizado",
+      suspendido: "Suspendido",
+      cancelado: "Cancelado",
+    };
+
+    const projRows: any[][] = [
+      ["PROYECTOS DEL ÁREA", "", "", "", "", "", ""],
+      ["#", "Nombre del Proyecto", "Descripción", "Impacto", "Dificultad", "Score (I×D)", "Estado"],
+    ];
+
+    const sorted = [...projectsData.projects].sort((a, b) => (b.impact * b.difficulty) - (a.impact * a.difficulty));
+    sorted.forEach((p: any, i: number) => {
+      projRows.push([
+        i + 1,
+        p.name,
+        p.description ?? "",
+        `${p.impact} — ${impactLabels[p.impact] ?? p.impact}`,
+        `${p.difficulty} — ${difficultyLabels[p.difficulty] ?? p.difficulty}`,
+        p.impact * p.difficulty,
+        statusLabels[p.status] ?? p.status,
+      ]);
+    });
+
+    const wsProj = XLSX.utils.aoa_to_sheet(projRows);
+    wsProj["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }];
+    setColWidths(wsProj, [5, 35, 50, 18, 18, 12, 18]);
+    XLSX.utils.book_append_sheet(wb, wsProj, "Proyectos");
+  }
 
   return wb;
 }

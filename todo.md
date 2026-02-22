@@ -142,3 +142,44 @@
 - [x] Crear endpoint trpc para consultar el progreso por módulo (cuántos tienen registros)
 - [x] Agregar barra de progreso visual en el dashboard (X de 5 módulos completados)
 - [x] Mostrar estado individual por módulo (completado/pendiente) en las tarjetas del dashboard
+
+## Feature v9 - Módulo Proyectos, Vista Consolidada, Fecha Límite
+
+### BD y Servidor
+- [x] Tabla `projects`: nombre, descripción, impacto (1-5), dificultad (1-5), subtotal, estado, observaciones, processId, hasNotification
+- [x] Tabla `appConfig`: clave/valor para fecha límite global y otras configuraciones
+- [x] Endpoints tRPC: projects.list, projects.create, projects.update, projects.delete
+- [x] Endpoints tRPC: admin.projects.listAll, admin.projects.updateProject, admin.projects.updateStatus
+- [x] Endpoint tRPC: config.getDeadline, config.setDeadline (solo admin)
+- [x] Endpoint tRPC: admin.progress.listAll (progreso consolidado de todos los usuarios)
+- [x] Notificación in-app (campo hasNotification en BD) cuando admin modifica proyecto
+
+### Módulo Usuario - Proyectos
+- [x] Pantalla `proyectos.tsx`: lista de proyectos ordenados por subtotal desc
+- [x] Formulario para crear/editar proyecto (nombre, descripción, impacto, dificultad)
+- [x] Selector visual de calificación 1-5 con etiquetas descriptivas
+- [x] Cálculo automático de subtotal (impacto × dificultad) y ordenamiento
+- [x] Badge de estado con color (Por Priorizar=rojo, En Ejecución=amarillo, Finalizado=verde, Suspendido=naranja, Cancelado=rojo)
+- [x] Notificación visible en tarjeta cuando admin modifica el proyecto
+- [x] Marcar notificación como leída al abrir el módulo de proyectos
+- [x] Etiquetas de dificultad corregidas: 1=Muy Difícil, 5=Muy Fácil
+
+### Módulo Admin - Proyectos
+- [x] Pantalla `admin-proyectos.tsx`: vista consolidada de proyectos por área
+- [x] Ordenamiento descendente por subtotal (impacto × dificultad)
+- [x] Edición de calificaciones (impacto y dificultad) por proyecto
+- [x] Selector de estado con colores (Por Priorizar, En Ejecución, Finalizado, Suspendido, Cancelado)
+- [x] Cuadro de diálogo de observaciones para Suspendido y Cancelado
+
+### Vista Consolidada de Progreso (Admin)
+- [x] Pantalla `admin-progreso.tsx`: tabla con nombre del área, módulos completados, porcentaje
+- [x] Accesible desde el panel de administrador (tab Progreso)
+
+### Fecha Límite con Contador Regresivo
+- [x] Campo configurable en panel admin para fecha límite global
+- [x] Contador regresivo visible en el dashboard de cada usuario
+- [x] Exportación de proyectos incluida en Excel (hoja Proyectos)
+
+### Notificaciones
+- [x] Notificación in-app en tarjeta de proyectos cuando admin modifica
+- [x] Marcar notificación como leída al abrir el módulo de proyectos

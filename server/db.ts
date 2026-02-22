@@ -103,8 +103,10 @@ import {
   interactionStrengths,
   authorizedUsers,
   moduleObservations,
+  projects,
+  appConfig,
 } from "../drizzle/schema";
-import { and, ne } from "drizzle-orm";
+import { and, ne, desc } from "drizzle-orm";
 
 // ============================================================
 // PROCESSES
@@ -626,14 +628,15 @@ export async function getModuleProgress(userId: number) {
       dofa: false,
       proveedores: false,
       clientes: false,
+      proyectos: false,
       completedCount: 0,
-      totalCount: 5,
+      totalCount: 6,
     };
   }
 
   const processId = process[0].id;
 
-  const [hierarchyRows, kpiRows, dofaRows, proveedorRows, clienteRows] = await Promise.all([
+  const [hierarchyRows, kpiRows, dofaRows, proveedorRows, clienteRows, projectRows] = await Promise.all([
     db.select().from(orgHierarchies).where(eq(orgHierarchies.processId, processId)).limit(1),
     db.select().from(kpis).where(eq(kpis.processId, processId)).limit(1),
     db.select().from(dofaMatrix).where(eq(dofaMatrix.processId, processId)).limit(1),
@@ -643,6 +646,7 @@ export async function getModuleProgress(userId: number) {
     db.select().from(processInteractions).where(
       and(eq(processInteractions.processId, processId), eq(processInteractions.type, "cliente"))
     ).limit(1),
+    db.select().from(projects).where(eq(projects.processId, processId)).limit(1),
   ]);
 
   const status = {
@@ -651,6 +655,7 @@ export async function getModuleProgress(userId: number) {
     dofa: dofaRows.length > 0,
     proveedores: proveedorRows.length > 0,
     clientes: clienteRows.length > 0,
+    proyectos: projectRows.length > 0,
   };
 
   const completedCount = Object.values(status).filter(Boolean).length;
@@ -658,6 +663,286 @@ export async function getModuleProgress(userId: number) {
   return {
     ...status,
     completedCount,
-    totalCount: 5,
+    totalCount: 6,
   };
+}
+
+// ─── Projects ──────────────────────────────────────────────────────────────────
+
+export async function getProjects(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const process = await db.select().from(processes).where(eq(processes.userId, userId)).limit(1);
+  if (process.length === 0) return [];
+
+  return db.select().from(projects)
+    .where(eq(projects.processId, process[0].id))
+    .orderBy(desc(projects.subtotal));
+}
+
+export async function createProject(userId: number, data: {
+  name: string;
+  description: string;
+  impact: number;
+  difficulty: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const process = await getOrCreateProcess(userId);
+  const subtotal = data.impact * data.difficulty;
+  await db.insert(projects).values({
+    processId: process.id,
+    name: data.name,
+    description: data.description,
+    impact: data.impact,
+    difficulty: data.difficulty,
+    subtotal,
+    status: "por_priorizar",
+    hasNotification: false,
+  });
+  const created = await db.select().from(projects)
+    .where(and(eq(projects.processId, process.id), eq(projects.name, data.name)))
+    .orderBy(desc(projects.createdAt))
+    .limit(1);
+  return created[0];
+}
+
+export async function updateProject(id: number, data: Partial<{
+  name: string;
+  description: string;
+  impact: number;
+  difficulty: number;
+  subtotal: number;
+  status: "por_priorizar" | "en_ejecucion" | "finalizado" | "suspendido" | "cancelado";
+  statusObservations: string | null;
+  hasNotification: boolean;
+  notificationMessage: string | null;
+  adminModifiedAt: Date | null;
+}>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(projects).set(data).where(eq(projects.id, id));
+  const updated = await db.select().from(projects).where(eq(projects.id, id)).limit(1);
+  return updated[0];
+}
+
+export async function deleteProject(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(projects).where(eq(projects.id, id));
+}
+
+export async function dismissProjectNotification(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(projects)
+    .set({ hasNotification: false, notificationMessage: null })
+    .where(eq(projects.id, id));
+}
+
+// Admin: get all projects across all areas
+export async function getAllProjects() {
+  const db = await getDb();
+  if (!db) return [];
+
+  const allProjects = await db.select().from(projects).orderBy(desc(projects.subtotal));
+  const result = [];
+
+  for (const project of allProjects) {
+    const process = await db.select().from(processes).where(eq(processes.id, project.processId)).limit(1);
+    const user = process.length > 0 ? await db.select().from(users).where(eq(users.id, process[0].userId)).limit(1) : [];
+    const authUser = user.length > 0 && user[0].email
+      ? await db.select().from(authorizedUsers).where(eq(authorizedUsers.email, user[0].email)).limit(1)
+      : [];
+
+    result.push({
+      ...project,
+      processName: process[0]?.processName ?? "",
+      areaName: process[0]?.areaName ?? authUser[0]?.areaName ?? "",
+      leaderName: authUser[0]?.name ?? user[0]?.name ?? "",
+      leaderEmail: user[0]?.email ?? "",
+    });
+  }
+
+  return result;
+}
+
+// Admin: update project status and optionally notify leader
+export async function adminUpdateProject(projectId: number, data: {
+  impact?: number;
+  difficulty?: number;
+  status?: "por_priorizar" | "en_ejecucion" | "finalizado" | "suspendido" | "cancelado";
+  statusObservations?: string | null;
+  notificationMessage?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const updateData: Parameters<typeof db.update>[0] extends infer T ? Partial<typeof projects.$inferInsert> : never = {};
+  if (data.impact !== undefined) {
+    updateData.impact = data.impact;
+    if (data.difficulty !== undefined) {
+      updateData.difficulty = data.difficulty;
+      updateData.subtotal = data.impact * data.difficulty;
+    }
+  }
+  if (data.difficulty !== undefined && data.impact === undefined) {
+    const current = await db.select().from(projects).where(eq(projects.id, projectId)).limit(1);
+    if (current.length > 0) {
+      updateData.difficulty = data.difficulty;
+      updateData.subtotal = current[0].impact * data.difficulty;
+    }
+  }
+  if (data.status !== undefined) updateData.status = data.status;
+  if (data.statusObservations !== undefined) updateData.statusObservations = data.statusObservations;
+  if (data.notificationMessage) {
+    updateData.hasNotification = true;
+    updateData.notificationMessage = data.notificationMessage;
+    updateData.adminModifiedAt = new Date();
+  }
+
+  await db.update(projects).set(updateData).where(eq(projects.id, projectId));
+  const updated = await db.select().from(projects).where(eq(projects.id, projectId)).limit(1);
+  return updated[0];
+}
+
+// ─── App Config ──────────────────────────────────────────────────────────────
+
+export async function getConfig(key: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(appConfig).where(eq(appConfig.key, key)).limit(1);
+  return result.length > 0 ? result[0].value : null;
+}
+
+export async function setConfig(key: string, value: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const existing = await db.select().from(appConfig).where(eq(appConfig.key, key)).limit(1);
+  if (existing.length === 0) {
+    await db.insert(appConfig).values({ key, value });
+  } else {
+    await db.update(appConfig).set({ value }).where(eq(appConfig.key, key));
+  }
+}
+
+// ─── Admin: Consolidated Progress ────────────────────────────────────────────
+
+export async function getConsolidatedProgress() {
+  const db = await getDb();
+  if (!db) return [];
+
+  // Get all authorized users with role=user
+  const authorizedUsersList = await db.select().from(authorizedUsers);
+  const result = [];
+
+  for (const authUser of authorizedUsersList) {
+    // Find the user in the users table
+    const userRow = authUser.isEnrolled
+      ? await db.select().from(users).where(eq(users.email, authUser.email)).limit(1)
+      : [];
+
+    if (userRow.length === 0) {
+      // User hasn't logged in yet
+      result.push({
+        id: authUser.id,
+        name: authUser.name,
+        email: authUser.email,
+        areaName: authUser.areaName ?? "",
+        role: authUser.role,
+        isEnrolled: authUser.isEnrolled,
+        organigrama: false,
+        kpis: false,
+        dofa: false,
+        proveedores: false,
+        clientes: false,
+        proyectos: false,
+        completedCount: 0,
+        totalCount: 6,
+        lastUpdated: null,
+      });
+      continue;
+    }
+
+    const userId = userRow[0].id;
+    const process = await db.select().from(processes).where(eq(processes.userId, userId)).limit(1);
+
+    if (process.length === 0) {
+      result.push({
+        id: authUser.id,
+        name: authUser.name,
+        email: authUser.email,
+        areaName: authUser.areaName ?? "",
+        role: authUser.role,
+        isEnrolled: authUser.isEnrolled,
+        organigrama: false,
+        kpis: false,
+        dofa: false,
+        proveedores: false,
+        clientes: false,
+        proyectos: false,
+        completedCount: 0,
+        totalCount: 6,
+        lastUpdated: null,
+      });
+      continue;
+    }
+
+    const processId = process[0].id;
+    const [hierarchyRows, kpiRows, dofaRows, proveedorRows, clienteRows, projectRows] = await Promise.all([
+      db.select().from(orgHierarchies).where(eq(orgHierarchies.processId, processId)).limit(1),
+      db.select().from(kpis).where(eq(kpis.processId, processId)).limit(1),
+      db.select().from(dofaMatrix).where(eq(dofaMatrix.processId, processId)).limit(1),
+      db.select().from(processInteractions).where(
+        and(eq(processInteractions.processId, processId), eq(processInteractions.type, "proveedor"))
+      ).limit(1),
+      db.select().from(processInteractions).where(
+        and(eq(processInteractions.processId, processId), eq(processInteractions.type, "cliente"))
+      ).limit(1),
+      db.select().from(projects).where(eq(projects.processId, processId)).limit(1),
+    ]);
+
+    const status = {
+      organigrama: hierarchyRows.length > 0,
+      kpis: kpiRows.length > 0,
+      dofa: dofaRows.length > 0,
+      proveedores: proveedorRows.length > 0,
+      clientes: clienteRows.length > 0,
+      proyectos: projectRows.length > 0,
+    };
+
+    const completedCount = Object.values(status).filter(Boolean).length;
+
+    result.push({
+      id: authUser.id,
+      name: authUser.name,
+      email: authUser.email,
+      areaName: authUser.areaName ?? "",
+      role: authUser.role,
+      isEnrolled: authUser.isEnrolled,
+      ...status,
+      completedCount,
+      totalCount: 6,
+      lastUpdated: process[0].updatedAt,
+    });
+  }
+
+  // Sort by completedCount descending
+  return result.sort((a, b) => b.completedCount - a.completedCount);
+}
+
+// Export projects data for Excel
+export async function getProjectsExportData(userId: number) {
+  const db = await getDb();
+  if (!db) return { process: null, projects: [] };
+
+  const process = await db.select().from(processes).where(eq(processes.userId, userId)).limit(1);
+  if (process.length === 0) return { process: null, projects: [] };
+
+  const projectList = await db.select().from(projects)
+    .where(eq(projects.processId, process[0].id))
+    .orderBy(desc(projects.subtotal));
+  return { process: process[0], projects: projectList };
 }

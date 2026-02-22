@@ -3,7 +3,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useAuth } from "@/hooks/use-auth";
 import { useColors } from "@/hooks/use-colors";
 import { trpc } from "@/lib/trpc";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { router } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Storage } from "@/lib/storage";
@@ -17,7 +17,40 @@ const MODULES = [
   { id: "dofa", title: "Análisis DOFA", icon: "🔍", description: "Debilidades, Oportunidades, Fortalezas, Amenazas", route: "/(tabs)/dofa", color: "#5CB85C" },
   { id: "proveedores", title: "Proveedores", icon: "📦", description: "Procesos que proveen al área", route: "/(tabs)/interacciones?type=proveedor", color: "#F5A623" },
   { id: "clientes", title: "Clientes", icon: "🤝", description: "Procesos que reciben del área", route: "/(tabs)/interacciones?type=cliente", color: "#6366F1" },
+  { id: "proyectos", title: "Proyectos", icon: "🚀", description: "Proyectos del área priorizados por impacto", route: "/(tabs)/proyectos", color: "#7C3AED" },
 ];
+
+function useCountdown(deadline: string | null | undefined) {
+  const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
+  const [expired, setExpired] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!deadline) { setTimeLeft(null); setExpired(false); return; }
+    const target = new Date(deadline);
+    if (isNaN(target.getTime())) { setTimeLeft(null); return; }
+
+    const calc = () => {
+      const diff = target.getTime() - Date.now();
+      if (diff <= 0) {
+        setExpired(true);
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+        if (timerRef.current) clearInterval(timerRef.current);
+        return;
+      }
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      setTimeLeft({ days, hours, minutes, seconds });
+    };
+    calc();
+    timerRef.current = setInterval(calc, 1000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [deadline]);
+
+  return { timeLeft, expired };
+}
 
 export default function HomeScreen() {
   const { user, logout } = useAuth();
@@ -58,6 +91,9 @@ export default function HomeScreen() {
 
   const progress = progressQuery.data;
 
+  const deadlineQuery = trpc.config.getDeadline.useQuery(undefined, { retry: false });
+  const { timeLeft, expired } = useCountdown(deadlineQuery.data?.deadline);
+
   // Map module id to progress status
   const moduleStatus: Record<string, boolean> = {
     organigrama: progress?.organigrama ?? false,
@@ -65,6 +101,7 @@ export default function HomeScreen() {
     dofa: progress?.dofa ?? false,
     proveedores: progress?.proveedores ?? false,
     clientes: progress?.clientes ?? false,
+    proyectos: (progress as any)?.proyectos ?? false,
   };
 
   const updateProcess = trpc.process.update.useMutation({
@@ -192,12 +229,44 @@ export default function HomeScreen() {
           )}
         </View>
 
+        {/* Countdown Timer */}
+        {timeLeft && (
+          <View style={[styles.countdownCard, expired && styles.countdownExpired]}>
+            <Text style={styles.countdownLabel}>{expired ? "⏰ Plazo vencido" : "⏳ Tiempo restante para entregar"}</Text>
+            {!expired ? (
+              <View style={styles.countdownRow}>
+                <View style={styles.countdownUnit}>
+                  <Text style={styles.countdownNumber}>{timeLeft.days}</Text>
+                  <Text style={styles.countdownUnitLabel}>días</Text>
+                </View>
+                <Text style={styles.countdownSep}>:</Text>
+                <View style={styles.countdownUnit}>
+                  <Text style={styles.countdownNumber}>{String(timeLeft.hours).padStart(2, "0")}</Text>
+                  <Text style={styles.countdownUnitLabel}>horas</Text>
+                </View>
+                <Text style={styles.countdownSep}>:</Text>
+                <View style={styles.countdownUnit}>
+                  <Text style={styles.countdownNumber}>{String(timeLeft.minutes).padStart(2, "0")}</Text>
+                  <Text style={styles.countdownUnitLabel}>min</Text>
+                </View>
+                <Text style={styles.countdownSep}>:</Text>
+                <View style={styles.countdownUnit}>
+                  <Text style={styles.countdownNumber}>{String(timeLeft.seconds).padStart(2, "0")}</Text>
+                  <Text style={styles.countdownUnitLabel}>seg</Text>
+                </View>
+              </View>
+            ) : (
+              <Text style={styles.countdownExpiredText}>El plazo de entrega ha vencido. Por favor contacta al administrador.</Text>
+            )}
+          </View>
+        )}
+
         {/* Progress Indicator */}
         <View style={styles.progressSection}>
           <View style={styles.progressHeader}>
             <Text style={styles.sectionLabel}>PROGRESO DEL LEVANTAMIENTO</Text>
             <Text style={styles.progressCount}>
-              {progress?.completedCount ?? 0} de {progress?.totalCount ?? 5} módulos
+              {progress?.completedCount ?? 0} de {progress?.totalCount ?? 6} módulos
             </Text>
           </View>
           <View style={styles.progressBarBg}>
@@ -205,9 +274,9 @@ export default function HomeScreen() {
               style={[
                 styles.progressBarFill,
                 {
-                  width: `${Math.round(((progress?.completedCount ?? 0) / (progress?.totalCount ?? 5)) * 100)}%`,
+                  width: `${Math.round(((progress?.completedCount ?? 0) / (progress?.totalCount ?? 6)) * 100)}%`,
                   backgroundColor:
-                    (progress?.completedCount ?? 0) === 5
+                    (progress?.completedCount ?? 0) === 6
                       ? "#5CB85C"
                       : (progress?.completedCount ?? 0) >= 3
                       ? "#F5A623"
@@ -217,7 +286,7 @@ export default function HomeScreen() {
             />
           </View>
           <Text style={styles.progressPercent}>
-            {Math.round(((progress?.completedCount ?? 0) / (progress?.totalCount ?? 5)) * 100)}% completado
+            {Math.round(((progress?.completedCount ?? 0) / (progress?.totalCount ?? 6)) * 100)}% completado
           </Text>
         </View>
 
@@ -550,6 +619,62 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: "#854D0E",
     fontWeight: "600",
+  },
+  countdownCard: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 4,
+    backgroundColor: "#1B4F9B",
+    borderRadius: 12,
+    padding: 16,
+    alignItems: "center",
+  },
+  countdownExpired: {
+    backgroundColor: "#CC2229",
+  },
+  countdownLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "rgba(255,255,255,0.85)",
+    marginBottom: 10,
+    letterSpacing: 0.5,
+  },
+  countdownRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  countdownUnit: {
+    alignItems: "center",
+    minWidth: 52,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  countdownNumber: {
+    fontSize: 26,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    lineHeight: 30,
+  },
+  countdownUnitLabel: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.75)",
+    fontWeight: "600",
+    marginTop: 2,
+  },
+  countdownSep: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.6)",
+    marginBottom: 12,
+  },
+  countdownExpiredText: {
+    fontSize: 13,
+    color: "rgba(255,255,255,0.9)",
+    textAlign: "center",
+    lineHeight: 18,
   },
   footer: {
     marginTop: 8,

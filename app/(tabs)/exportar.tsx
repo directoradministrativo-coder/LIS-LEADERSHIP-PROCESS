@@ -8,12 +8,13 @@ import { buildExcelWorkbook, downloadExcel } from "@/lib/excel-export";
 import { useAuth } from "@/hooks/use-auth";
 import { MaterialIcons } from "@expo/vector-icons";
 
-const EXPORT_SECTIONS = [
+  const EXPORT_SECTIONS = [
   { key: "organigrama", label: "Organigrama del Área", icon: "👥", color: "#1B4F9B" },
   { key: "kpis", label: "KPIs del Proceso", icon: "📊", color: "#CC2229" },
   { key: "dofa", label: "Análisis DOFA", icon: "🔍", color: "#5CB85C" },
   { key: "proveedores", label: "Proveedores del Proceso", icon: "📦", color: "#F5A623" },
   { key: "clientes", label: "Clientes del Proceso", icon: "🤝", color: "#6366F1" },
+  { key: "proyectos", label: "Proyectos del Área", icon: "🚀", color: "#7C3AED" },
 ];
 
 export default function ExportarScreen() {
@@ -30,6 +31,7 @@ export default function ExportarScreen() {
   const kpisExportQuery = trpc.export.kpis.useQuery();
   const dofaExportQuery = trpc.export.dofa.useQuery();
   const interactionsExportQuery = trpc.export.interactions.useQuery();
+  const projectsExportQuery = trpc.export.projects.useQuery();
 
   // Admin queries
   const allProcessesQuery = trpc.admin.getAllProcesses.useQuery(undefined, { enabled: isAdmin });
@@ -39,13 +41,16 @@ export default function ExportarScreen() {
     orgChartQuery.isLoading ||
     kpisExportQuery.isLoading ||
     dofaExportQuery.isLoading ||
-    interactionsExportQuery.isLoading;
+    interactionsExportQuery.isLoading ||
+    projectsExportQuery.isLoading;
 
   const process = processQuery.data;
   const orgData = orgChartQuery.data;
   const kpisData = kpisExportQuery.data;
   const dofaData = dofaExportQuery.data;
   const interactionsData = interactionsExportQuery.data;
+
+  const projectsExportData = projectsExportQuery.data;
 
   const stats = {
     cargos: orgData?.hierarchies?.length ?? 0,
@@ -57,6 +62,7 @@ export default function ExportarScreen() {
     amenazas: dofaData?.dofa?.amenazas?.length ?? 0,
     proveedores: interactionsData?.interactions?.filter((i: any) => i.type === "proveedor")?.length ?? 0,
     clientes: interactionsData?.interactions?.filter((i: any) => i.type === "cliente")?.length ?? 0,
+    proyectos: projectsExportData?.projects?.length ?? 0,
   };
 
   const totalItems = Object.values(stats).reduce((a, b) => a + b, 0);
@@ -84,7 +90,8 @@ export default function ExportarScreen() {
         { process, hierarchies: orgData?.hierarchies ?? [], collaborators: orgData?.collaborators ?? [], functions: orgData?.functions ?? [] },
         { process, kpis: kpisData?.kpis ?? [] },
         { process, dofa: dofaData?.dofa },
-        { process, interactions: interactionsData?.interactions ?? [] }
+        { process, interactions: interactionsData?.interactions ?? [] },
+        { process, projects: projectsExportData?.projects ?? [] }
       );
       const filename = `LIS_Levantamiento_${process.processName.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.xlsx`;
       await downloadExcel(wb, filename);

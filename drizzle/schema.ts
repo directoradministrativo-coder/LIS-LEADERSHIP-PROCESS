@@ -207,3 +207,39 @@ export const moduleObservations = mysqlTable("moduleObservations", {
 
 export type ModuleObservation = typeof moduleObservations.$inferSelect;
 export type InsertModuleObservation = typeof moduleObservations.$inferInsert;
+
+/**
+ * Proyectos del proceso
+ */
+export const projects = mysqlTable("projects", {
+  id: int("id").autoincrement().primaryKey(),
+  processId: int("processId").notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description").notNull(),
+  impact: int("impact").notNull(), // 1-5
+  difficulty: int("difficulty").notNull(), // 1-5
+  subtotal: int("subtotal").notNull(), // impact * difficulty
+  status: mysqlEnum("status", ["por_priorizar", "en_ejecucion", "finalizado", "suspendido", "cancelado"]).default("por_priorizar").notNull(),
+  statusObservations: text("statusObservations"),
+  hasNotification: boolean("hasNotification").default(false).notNull(),
+  notificationMessage: text("notificationMessage"),
+  adminModifiedAt: timestamp("adminModifiedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Project = typeof projects.$inferSelect;
+export type InsertProject = typeof projects.$inferInsert;
+
+/**
+ * Configuración global de la app (fecha límite, etc.)
+ */
+export const appConfig = mysqlTable("appConfig", {
+  id: int("id").autoincrement().primaryKey(),
+  key: varchar("key", { length: 100 }).notNull().unique(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type AppConfig = typeof appConfig.$inferSelect;
+export type InsertAppConfig = typeof appConfig.$inferInsert;
