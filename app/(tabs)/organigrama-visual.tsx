@@ -5,7 +5,7 @@ import {
 import { ScreenContainer } from "@/components/screen-container";
 import { trpc } from "@/lib/trpc";
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { useAuth } from "@/hooks/use-auth";
+import { useLisRole } from "./_layout";
 import { MaterialIcons } from "@expo/vector-icons";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -258,8 +258,8 @@ function UserOrgView() {
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function OrganigramaVisualScreen() {
-  const { user } = useAuth();
-  const isAdmin = (user as any)?.role === "admin";
+  const lisRole = useLisRole();
+  const isAdmin = lisRole === "admin" || lisRole === "superadmin";
 
   return (
     <ScreenContainer containerClassName="bg-white">

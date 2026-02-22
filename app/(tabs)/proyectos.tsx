@@ -181,6 +181,7 @@ function ProjectCard({
 
 export default function ProyectosScreen() {
   const lisRole = useLisRole();
+  const isAdmin = lisRole === "admin" || lisRole === "superadmin";
   const [showForm, setShowForm] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
 
@@ -189,7 +190,14 @@ export default function ProyectosScreen() {
   const [impact, setImpact] = useState(3);
   const [difficulty, setDifficulty] = useState(3);
 
-  const { data: projectList = [], refetch, isLoading } = trpc.project.list.useQuery();
+  // User sees only their own projects; admin/superadmin see all projects consolidated
+  const userQuery = trpc.project.list.useQuery(undefined, { enabled: !isAdmin });
+  const adminQuery = trpc.admin.getAllProjects.useQuery(undefined, { enabled: isAdmin });
+  const projectList: Project[] = isAdmin
+    ? ((adminQuery.data ?? []) as any[]).sort((a: any, b: any) => b.subtotal - a.subtotal)
+    : (userQuery.data ?? []) as Project[];
+  const isLoading = isAdmin ? adminQuery.isLoading : userQuery.isLoading;
+  const refetch = isAdmin ? adminQuery.refetch : userQuery.refetch;
 
   const createMutation = trpc.project.create.useMutation({
     onSuccess: () => {

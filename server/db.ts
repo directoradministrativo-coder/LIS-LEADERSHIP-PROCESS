@@ -1318,3 +1318,47 @@ export async function getAuditLogsExportData() {
     restaurado: log.isRestored ? "Sí" : "No",
   }));
 }
+
+// ─── User Individual Progress ─────────────────────────────────────────────────
+export async function getUserProgress(userId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const process = await db.select().from(processes).where(eq(processes.userId, userId)).limit(1);
+  if (process.length === 0) return null;
+
+  const proc = process[0];
+  const processId = proc.id;
+
+  const hierarchies = await db.select().from(orgHierarchies).where(eq(orgHierarchies.processId, processId)).limit(1);
+  const kpiList = await db.select().from(kpis).where(eq(kpis.processId, processId)).limit(1);
+  const dofaList = await db.select().from(dofaMatrix).where(eq(dofaMatrix.processId, processId)).limit(1);
+  const proveedores = await db.select().from(processInteractions)
+    .where(and(eq(processInteractions.processId, processId), eq(processInteractions.type, "proveedor"))).limit(1);
+  const clientes = await db.select().from(processInteractions)
+    .where(and(eq(processInteractions.processId, processId), eq(processInteractions.type, "cliente"))).limit(1);
+  const projectList = await db.select().from(projects).where(eq(projects.processId, processId)).limit(1);
+
+  const organigramaOk = hierarchies.length > 0;
+  const kpisOk = kpiList.length > 0;
+  const dofaOk = dofaList.length > 0;
+  const proveedoresOk = proveedores.length > 0;
+  const clientesOk = clientes.length > 0;
+  const proyectosOk = projectList.length > 0;
+
+  const completedCount = [organigramaOk, kpisOk, dofaOk, proveedoresOk, clientesOk, proyectosOk].filter(Boolean).length;
+
+  return {
+    processId,
+    processName: proc.processName ?? "",
+    areaName: proc.areaName ?? "",
+    organigrama: organigramaOk,
+    kpis: kpisOk,
+    dofa: dofaOk,
+    proveedores: proveedoresOk,
+    clientes: clientesOk,
+    proyectos: proyectosOk,
+    completedCount,
+    totalCount: 6,
+  };
+}

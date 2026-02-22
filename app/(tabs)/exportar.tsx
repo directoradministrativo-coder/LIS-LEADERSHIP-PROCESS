@@ -5,7 +5,7 @@ import { ScreenContainer } from "@/components/screen-container";
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 import { buildExcelWorkbook, downloadExcel } from "@/lib/excel-export";
-import { useAuth } from "@/hooks/use-auth";
+import { useLisRole } from "./_layout";
 import { MaterialIcons } from "@expo/vector-icons";
 
   const EXPORT_SECTIONS = [
@@ -18,8 +18,8 @@ import { MaterialIcons } from "@expo/vector-icons";
 ];
 
 export default function ExportarScreen() {
-  const { user } = useAuth();
-  const isAdmin = (user as any)?.role === "admin";
+  const lisRole = useLisRole();
+  const isAdmin = lisRole === "admin" || lisRole === "superadmin";
 
   const [isExporting, setIsExporting] = useState(false);
   const [exportMode, setExportMode] = useState<"individual" | "consolidated" | "selected">("individual");

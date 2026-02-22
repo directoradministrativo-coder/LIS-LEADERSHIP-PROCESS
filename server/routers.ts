@@ -345,6 +345,10 @@ export const appRouter = router({
     get: protectedProcedure.query(async ({ ctx }) => {
       return db.getModuleProgress(ctx.user.id);
     }),
+    // Returns full progress summary for the current user (modules completed, percentages)
+    myProgress: protectedProcedure.query(async ({ ctx }) => {
+      return db.getUserProgress(ctx.user.id);
+    }),
   }),
 
   // Projects

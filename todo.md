@@ -266,3 +266,41 @@
 - [x] Descripción en amarillo antes del botón explicando qué hará la acción
 - [x] Confirmación diferenciada en Alert.alert según el tipo de acción
 - [x] Borde de tarjeta en color de acción para registros no restaurados (todos los tipos)
+
+## Feature v16 - Permisos y Visualizaciones por Perfil
+
+### Organigrama Visual
+- [x] Corregir detección de rol: usar useLisRole() en vez de (user as any)?.role === "admin"
+- [x] Admin/superadmin ven todos los organigramas de todos los procesos graficados juntos
+- [x] User solo ve el organigrama de su propio proceso
+
+### Módulo Proyectos
+- [x] User: usa trpc.project.list (solo sus proyectos, filtrado por processId)
+- [x] Admin/superadmin: usa trpc.admin.getAllProjects (todos los proyectos de todos los procesos)
+- [x] Bifurcación de query según rol con useLisRole()
+
+### Módulo Progreso
+- [x] Agregar función getUserProgress en db.ts (progreso individual del usuario)
+- [x] Agregar endpoint progress.myProgress en routers.ts
+- [x] User ve "Mi Progreso": tarjetas de módulos con estado completado/pendiente
+- [x] Admin/superadmin ven "Progreso Consolidado": tabla de todos los líderes
+- [x] Tab "Progreso" visible para todos los roles (contenido diferenciado)
+
+### Tabs ocultos para user
+- [x] Tab "Exportar": oculto para user (href: null), visible solo para admin/superadmin
+- [x] Tab "Usuarios": ya estaba oculto para user (correcto)
+- [x] Tab "Historial": ya estaba oculto para user (correcto)
+- [x] Tab "Proy. Admin": ya estaba oculto para user (correcto)
+
+### Exportar
+- [x] Corregir detección de rol en exportar.tsx: usar useLisRole() en vez de useAuth()
+- [x] isAdmin ahora detecta correctamente admin y superadmin de la tabla LIS
+
+### Validación de código
+- [x] organigrama-visual.tsx: useLisRole() ✓
+- [x] proyectos.tsx: useLisRole() ✓
+- [x] admin-progreso.tsx: useLisRole() + bifurcación de vista ✓
+- [x] exportar.tsx: useLisRole() ✓
+- [x] admin-historial.tsx: useLisRole() ✓
+- [x] admin-usuarios.tsx: protegido por tab layout (href: isAdmin ? undefined : null) ✓
+- [x] TypeScript: 0 errores ✓

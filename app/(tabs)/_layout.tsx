@@ -222,6 +222,7 @@ export default function TabLayout() {
             options={{
               title: "Exportar",
               tabBarIcon: ({ color, size }) => <MaterialIcons name="download" size={size} color={color} />,
+              href: isAdmin ? undefined : null,
             }}
           />
           <Tabs.Screen
@@ -253,7 +254,6 @@ export default function TabLayout() {
             options={{
               title: "Progreso",
               tabBarIcon: ({ color, size }) => <MaterialIcons name="leaderboard" size={size} color={color} />,
-              href: isAdmin ? undefined : null,
             }}
           />
           <Tabs.Screen

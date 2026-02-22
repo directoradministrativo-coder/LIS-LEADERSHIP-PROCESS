@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { trpc } from "@/lib/trpc";
+import { useLisRole } from "./_layout";
 
 const LIS_RED = "#E63946";
 const LIS_BLUE = "#1D3557";
@@ -80,11 +81,77 @@ function ModuleDots({ entry }: { entry: ProgressEntry }) {
   );
 }
 
+function UserProgressView() {
+  const { data: myProgress, isLoading } = trpc.progress.myProgress.useQuery();
+  const modules = ["organigrama", "kpis", "dofa", "proveedores", "clientes", "proyectos"] as const;
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={LIS_BLUE} />
+      </View>
+    );
+  }
+
+  if (!myProgress) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>No hay datos de progreso aún. Comienza a diligenciar los módulos.</Text>
+      </View>
+    );
+  }
+
+  const pct = Math.round((myProgress.completedCount / myProgress.totalCount) * 100);
+  const pctColor = pct === 100 ? LIS_GREEN : pct >= 50 ? LIS_YELLOW : pct > 0 ? LIS_ORANGE : LIS_RED;
+
+  return (
+    <ScrollView contentContainerStyle={styles.scrollContent}>
+      <View style={[styles.summaryCard, { borderTopColor: LIS_BLUE, marginBottom: 16 }]}>
+        <Text style={styles.summaryLabel}>Proceso</Text>
+        <Text style={[styles.summaryValue, { fontSize: 18 }]}>{myProgress.processName || "Sin nombre"}</Text>
+        {myProgress.areaName ? <Text style={styles.summaryLabel}>{myProgress.areaName}</Text> : null}
+      </View>
+
+      <View style={styles.summaryRow}>
+        <View style={[styles.summaryCard, { borderTopColor: LIS_BLUE }]}>
+          <Text style={styles.summaryValue}>{myProgress.completedCount}</Text>
+          <Text style={styles.summaryLabel}>Completados</Text>
+        </View>
+        <View style={[styles.summaryCard, { borderTopColor: LIS_GREEN }]}>
+          <Text style={[styles.summaryValue, { color: pctColor }]}>{pct}%</Text>
+          <Text style={styles.summaryLabel}>Progreso</Text>
+        </View>
+        <View style={[styles.summaryCard, { borderTopColor: LIS_YELLOW }]}>
+          <Text style={styles.summaryValue}>{myProgress.totalCount - myProgress.completedCount}</Text>
+          <Text style={styles.summaryLabel}>Pendientes</Text>
+        </View>
+      </View>
+
+      <View style={styles.tableContainer}>
+        <View style={styles.tableHeader}>
+          <Text style={[styles.tableHeaderCell, { flex: 2 }]}>Módulo</Text>
+          <Text style={[styles.tableHeaderCell, { flex: 1, textAlign: "center" }]}>Estado</Text>
+        </View>
+        {modules.map((m, idx) => (
+          <View key={m} style={[styles.tableRow, idx % 2 === 0 && styles.tableRowEven]}>
+            <Text style={[styles.tableAreaName, { flex: 2 }]}>{MODULE_LABELS[m]}</Text>
+            <View style={{ flex: 1, alignItems: "center" }}>
+              <View style={[styles.moduleDot, { width: 20, height: 20, borderRadius: 10, backgroundColor: myProgress[m] ? LIS_GREEN : "#E5E7EB" }]} />
+            </View>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
 export default function AdminProgresoScreen() {
+  const lisRole = useLisRole();
+  const isAdmin = lisRole === "admin" || lisRole === "superadmin";
   const [showDeadlineModal, setShowDeadlineModal] = useState(false);
   const [deadlineInput, setDeadlineInput] = useState("");
 
-  const { data: progressList = [], isLoading, refetch } = trpc.admin.getConsolidatedProgress.useQuery();
+  const { data: progressList = [], isLoading, refetch } = trpc.admin.getConsolidatedProgress.useQuery({ enabled: isAdmin } as any);
   const { data: deadlineData, refetch: refetchDeadline } = trpc.config.getDeadline.useQuery();
 
   const setDeadlineMutation = trpc.config.setDeadline.useMutation({
@@ -137,6 +204,20 @@ export default function AdminProgresoScreen() {
             totalUsers
         )
       : 0;
+
+  if (!isAdmin) {
+    return (
+      <ScreenContainer>
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.headerTitle}>Mi Progreso</Text>
+            <Text style={styles.headerSub}>Estado de tus módulos</Text>
+          </View>
+        </View>
+        <UserProgressView />
+      </ScreenContainer>
+    );
+  }
 
   return (
     <ScreenContainer>
