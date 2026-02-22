@@ -105,22 +105,15 @@ export default function TabLayout() {
   const role = (user as any)?.role as string | undefined;
   const isAdmin = role === "admin" || role === "superadmin";
 
-  if (loading) {
-    return (
-      <View style={{ flex: 1, backgroundColor: "#FFFFFF", justifyContent: "center", alignItems: "center" }}>
-        <View style={{ flexDirection: "row", height: 6, width: "100%", position: "absolute", top: 0 }}>
-          {["#CC2229", "#F5A623", "#5CB85C", "#1B4F9B"].map(c => (
-            <View key={c} style={{ flex: 1, backgroundColor: c }} />
-          ))}
-        </View>
-        <ActivityIndicator size="large" color="#CC2229" />
-        <Text style={{ marginTop: 12, fontSize: 14, color: "#6B7280" }}>Cargando...</Text>
-      </View>
-    );
-  }
+  // Redirect to login as soon as we know user is not authenticated
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      router.replace("/login" as any);
+    }
+  }, [loading, isAuthenticated]);
 
-  if (!isAuthenticated) {
-    // Show loading while redirecting to login (handled in AuthorizationGate)
+  // Show loading spinner while checking auth state
+  if (loading || (!isAuthenticated && !loading)) {
     return (
       <View style={{ flex: 1, backgroundColor: "#FFFFFF", justifyContent: "center", alignItems: "center" }}>
         <View style={{ flexDirection: "row", height: 6, width: "100%", position: "absolute", top: 0 }}>
@@ -129,7 +122,9 @@ export default function TabLayout() {
           ))}
         </View>
         <ActivityIndicator size="large" color="#CC2229" />
-        <Text style={{ marginTop: 12, fontSize: 14, color: "#6B7280" }}>Iniciando sesión...</Text>
+        <Text style={{ marginTop: 12, fontSize: 14, color: "#6B7280" }}>
+          {loading ? "Cargando..." : "Redirigiendo al inicio de sesión..."}
+        </Text>
       </View>
     );
   }

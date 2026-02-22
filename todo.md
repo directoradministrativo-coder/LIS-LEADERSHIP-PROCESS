@@ -123,3 +123,7 @@
 - [x] Implementar selector de perfil en login para usuarios SuperAdmin
 - [x] Agregar botón de configuración (gestión de usuarios) visible en el header
 - [x] Asegurar que el tab Admin Usuarios sea accesible para admin y superadmin
+
+## Bug Fix v5 - Login
+- [ ] Corregir bug: app queda atascada en "Iniciando sesión..." sin redirigir al login cuando no hay sesión
+- [ ] Agregar timeout/fallback: si en 3s no hay sesión, redirigir automáticamente a /login
