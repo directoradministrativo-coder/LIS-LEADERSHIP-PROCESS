@@ -66,6 +66,9 @@ export default function HomeScreen() {
   const dbRole = useDbRole();
   const isSuperAdmin = dbRole === "superadmin";
   const isAdmin = lisRole === "admin" || lisRole === "superadmin";
+  // Derive activeProfile from effectiveRole for real-time accuracy
+  // (instead of reading from Storage which may lag)
+  const activeProfileFromRole: "user" | "admin" = isAdmin ? "admin" : "user";
 
   useEffect(() => {
     Storage.getItem(PROFILE_KEY).then((p: string | null) => {
@@ -143,8 +146,8 @@ export default function HomeScreen() {
           resizeMode="contain"
         />
         <View style={styles.headerActions}>
-          {/* Settings button - visible for admin and superadmin (based on dbRole) */}
-          {(dbRole === "admin" || dbRole === "superadmin") && (
+          {/* Settings button - visible only when navigating as admin (effectiveRole) */}
+          {isAdmin && (
             <TouchableOpacity
               style={styles.settingsBtn}
               onPress={() => router.push("/(tabs)/admin-usuarios" as any)}
@@ -152,19 +155,19 @@ export default function HomeScreen() {
               <MaterialIcons name="manage-accounts" size={20} color="#1B4F9B" />
             </TouchableOpacity>
           )}
-          {/* Profile switcher for SuperAdmin */}
+          {/* Profile switcher for SuperAdmin - uses effectiveRole for real-time badge */}
           {isSuperAdmin && (
             <TouchableOpacity
-              style={[styles.profileBadge, { backgroundColor: activeProfile === "admin" ? "#CC2229" : "#EEF2FF", borderColor: activeProfile === "admin" ? "#CC2229" : "#C7D2FE" }]}
+              style={[styles.profileBadge, { backgroundColor: activeProfileFromRole === "admin" ? "#CC2229" : "#EEF2FF", borderColor: activeProfileFromRole === "admin" ? "#CC2229" : "#C7D2FE" }]}
               onPress={() => router.push("/select-profile" as any)}
             >
               <MaterialIcons
-                name={activeProfile === "admin" ? "admin-panel-settings" : "person"}
+                name={activeProfileFromRole === "admin" ? "admin-panel-settings" : "person"}
                 size={13}
-                color={activeProfile === "admin" ? "#FFFFFF" : "#1B4F9B"}
+                color={activeProfileFromRole === "admin" ? "#FFFFFF" : "#1B4F9B"}
               />
-              <Text style={[styles.profileBadgeText, { color: activeProfile === "admin" ? "#FFFFFF" : "#1B4F9B" }]}>
-                {activeProfile === "admin" ? "Admin" : "Usuario"}
+              <Text style={[styles.profileBadgeText, { color: activeProfileFromRole === "admin" ? "#FFFFFF" : "#1B4F9B" }]}>
+                {activeProfileFromRole === "admin" ? "Admin" : "Usuario"}
               </Text>
             </TouchableOpacity>
           )}

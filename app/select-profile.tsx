@@ -6,6 +6,7 @@ import { router } from "expo-router";
 import { useAuth } from "@/hooks/use-auth";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Storage } from "@/lib/storage";
+import { ProfileStore } from "@/lib/profile-store";
 
 const PROFILE_KEY = "lis_active_profile";
 
@@ -14,6 +15,9 @@ export default function SelectProfileScreen() {
 
   const selectProfile = async (profile: "user" | "admin") => {
     await Storage.setItem(PROFILE_KEY, profile);
+    // Notify the TabLayout context immediately via the store
+    // so effectiveRole updates without a full re-mount
+    ProfileStore.set(profile);
     router.replace("/(tabs)" as any);
   };
 

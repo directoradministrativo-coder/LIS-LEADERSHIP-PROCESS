@@ -15,6 +15,7 @@ import { useEffect, useState, createContext, useContext } from "react";
 import { MaterialIcons } from "@expo/vector-icons";
 import { trpc } from "@/lib/trpc";
 import { Storage } from "@/lib/storage";
+import { ProfileStore } from "@/lib/profile-store";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 
 const PROFILE_KEY = "lis_active_profile";
@@ -354,6 +355,20 @@ export default function TabLayout() {
       router.replace("/login" as any);
     }
   }, [loading, isAuthenticated]);
+
+  // Subscribe to ProfileStore: when SuperAdmin selects a profile in select-profile.tsx,
+  // update the effectiveRole immediately WITHOUT re-mounting the layout.
+  // This is the definitive fix for the frozen effectiveRole bug.
+  useEffect(() => {
+    const unsubscribe = ProfileStore.subscribe((profile) => {
+      setRoles(prev => {
+        if (prev === null || prev.dbRole !== "superadmin") return prev;
+        const effectiveRole: LisRole = profile === "user" ? "user" : "superadmin";
+        return { effectiveRole, dbRole: prev.dbRole };
+      });
+    });
+    return unsubscribe;
+  }, []);
 
   if (loading || (!isAuthenticated && !loading)) {
     return (
