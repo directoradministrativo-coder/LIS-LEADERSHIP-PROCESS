@@ -1,26 +1,40 @@
 import { Tabs, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Platform, View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
-import { useColors } from "@/hooks/use-colors";
 import { useAuth } from "@/hooks/use-auth";
-import { useEffect, useState } from "react";
+import { useEffect, useState, createContext, useContext } from "react";
 import { MaterialIcons } from "@expo/vector-icons";
 import { trpc } from "@/lib/trpc";
 import { Storage } from "@/lib/storage";
 
 const PROFILE_KEY = "lis_active_profile";
+const ROLE_KEY = "lis_user_role";
+
+// ─── LIS Role Context ─────────────────────────────────────────────────────────
+// Shares the verified LIS role (from DB) across the entire tab tree
+
+type LisRole = "user" | "admin" | "superadmin" | null;
+
+const LisRoleContext = createContext<LisRole>(null);
+export function useLisRole() { return useContext(LisRoleContext); }
 
 // ─── Authorization Gate ───────────────────────────────────────────────────────
 
-function AuthorizationGate({ children }: { children: React.ReactNode }) {
+function AuthorizationGate({
+  children,
+  onRoleResolved,
+}: {
+  children: React.ReactNode;
+  onRoleResolved: (role: LisRole) => void;
+}) {
   const { user, isAuthenticated, loading, logout } = useAuth();
   const [authState, setAuthState] = useState<"checking" | "authorized" | "unauthorized">("checking");
-  const [profileChecked, setProfileChecked] = useState(false);
 
   const handleUnauthorizedBack = async () => {
-    // Full logout: clear session cookie + storage, then go to login
     try { await logout(); } catch { /* ignore */ }
     await Storage.removeItem(PROFILE_KEY);
+    await Storage.removeItem(ROLE_KEY);
+    onRoleResolved(null);
     router.replace("/login" as any);
   };
 
@@ -36,22 +50,26 @@ function AuthorizationGate({ children }: { children: React.ReactNode }) {
     }
     if (checkAuth.isSuccess) {
       if (checkAuth.data?.authorized) {
-        // SuperAdmin: redirect to profile selector only if no profile has been chosen yet
-        if (checkAuth.data.role === "superadmin") {
+        const lisRole = (checkAuth.data.role ?? "user") as LisRole;
+        // Persist role for logout cleanup
+        Storage.setItem(ROLE_KEY, lisRole ?? "user");
+        // Notify TabLayout of the resolved role immediately
+        onRoleResolved(lisRole);
+
+        if (lisRole === "superadmin") {
           Storage.getItem(PROFILE_KEY).then(savedProfile => {
             if (!savedProfile) {
-              // First time: go to profile selector
               router.replace("/select-profile" as any);
             } else {
-              // Already chose a profile: allow access
               setAuthState("authorized");
             }
-            setProfileChecked(true);
           });
           return;
         }
         setAuthState("authorized");
       } else {
+        Storage.removeItem(ROLE_KEY);
+        onRoleResolved(null);
         setAuthState("unauthorized");
       }
     }
@@ -80,15 +98,14 @@ function AuthorizationGate({ children }: { children: React.ReactNode }) {
           </View>
           <Text style={styles.unauthorizedTitle}>Acceso No Autorizado</Text>
           <Text style={styles.unauthorizedMessage}>
-            Tu cuenta <Text style={styles.unauthorizedEmail}>{(user as any)?.email}</Text> no está en la lista de usuarios autorizados para ingresar a esta aplicación.
+            Tu cuenta{" "}
+            <Text style={styles.unauthorizedEmail}>{(user as any)?.email}</Text>{" "}
+            no está en la lista de usuarios autorizados para ingresar a esta aplicación.
           </Text>
           <Text style={styles.unauthorizedSubMessage}>
             Por favor contacta al administrador de LIS para solicitar acceso.
           </Text>
-          <TouchableOpacity
-            style={styles.logoutBtn}
-            onPress={handleUnauthorizedBack}
-          >
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleUnauthorizedBack}>
             <MaterialIcons name="logout" size={18} color="#FFFFFF" />
             <Text style={styles.logoutBtnText}>Volver al inicio</Text>
           </TouchableOpacity>
@@ -103,14 +120,14 @@ function AuthorizationGate({ children }: { children: React.ReactNode }) {
 // ─── Tab Layout ───────────────────────────────────────────────────────────────
 
 export default function TabLayout() {
-  const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { isAuthenticated, loading, user } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 8);
   const tabBarHeight = 56 + bottomPadding;
 
-  const role = (user as any)?.role as string | undefined;
-  const isAdmin = role === "admin" || role === "superadmin";
+  // lisRole is set synchronously when AuthorizationGate resolves the role
+  const [lisRole, setLisRole] = useState<LisRole>(null);
+  const isAdmin = lisRole === "admin" || lisRole === "superadmin";
 
   // Redirect to login as soon as we know user is not authenticated
   useEffect(() => {
@@ -137,86 +154,88 @@ export default function TabLayout() {
   }
 
   return (
-    <AuthorizationGate>
-      <Tabs
-        screenOptions={{
-          tabBarActiveTintColor: "#CC2229",
-          tabBarInactiveTintColor: "#9CA3AF",
-          headerShown: false,
-          tabBarStyle: {
-            paddingTop: 6,
-            paddingBottom: bottomPadding,
-            height: tabBarHeight,
-            backgroundColor: "#FFFFFF",
-            borderTopColor: "#E5E7EB",
-            borderTopWidth: 0.5,
-          },
-          tabBarLabelStyle: {
-            fontSize: 10,
-            fontWeight: "600",
-          },
-        }}
-      >
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: "Inicio",
-            tabBarIcon: ({ color, size }) => <MaterialIcons name="home" size={size} color={color} />,
+    <LisRoleContext.Provider value={lisRole}>
+      <AuthorizationGate onRoleResolved={setLisRole}>
+        <Tabs
+          screenOptions={{
+            tabBarActiveTintColor: "#CC2229",
+            tabBarInactiveTintColor: "#9CA3AF",
+            headerShown: false,
+            tabBarStyle: {
+              paddingTop: 6,
+              paddingBottom: bottomPadding,
+              height: tabBarHeight,
+              backgroundColor: "#FFFFFF",
+              borderTopColor: "#E5E7EB",
+              borderTopWidth: 0.5,
+            },
+            tabBarLabelStyle: {
+              fontSize: 10,
+              fontWeight: "600",
+            },
           }}
-        />
-        <Tabs.Screen
-          name="organigrama"
-          options={{
-            title: "Organigrama",
-            tabBarIcon: ({ color, size }) => <MaterialIcons name="account-tree" size={size} color={color} />,
-          }}
-        />
-        <Tabs.Screen
-          name="organigrama-visual"
-          options={{
-            title: "Vista Org.",
-            tabBarIcon: ({ color, size }) => <MaterialIcons name="hub" size={size} color={color} />,
-          }}
-        />
-        <Tabs.Screen
-          name="kpis"
-          options={{
-            title: "KPIs",
-            tabBarIcon: ({ color, size }) => <MaterialIcons name="bar-chart" size={size} color={color} />,
-          }}
-        />
-        <Tabs.Screen
-          name="dofa"
-          options={{
-            title: "DOFA",
-            tabBarIcon: ({ color, size }) => <MaterialIcons name="search" size={size} color={color} />,
-          }}
-        />
-        <Tabs.Screen
-          name="interacciones"
-          options={{
-            title: "Interacciones",
-            tabBarIcon: ({ color, size }) => <MaterialIcons name="swap-horiz" size={size} color={color} />,
-          }}
-        />
-        <Tabs.Screen
-          name="exportar"
-          options={{
-            title: "Exportar",
-            tabBarIcon: ({ color, size }) => <MaterialIcons name="download" size={size} color={color} />,
-          }}
-        />
-        {/* Admin-only tabs */}
-        <Tabs.Screen
-          name="admin-usuarios"
-          options={{
-            title: "Usuarios",
-            tabBarIcon: ({ color, size }) => <MaterialIcons name="manage-accounts" size={size} color={color} />,
-            href: isAdmin ? undefined : null,
-          }}
-        />
-      </Tabs>
-    </AuthorizationGate>
+        >
+          <Tabs.Screen
+            name="index"
+            options={{
+              title: "Inicio",
+              tabBarIcon: ({ color, size }) => <MaterialIcons name="home" size={size} color={color} />,
+            }}
+          />
+          <Tabs.Screen
+            name="organigrama"
+            options={{
+              title: "Organigrama",
+              tabBarIcon: ({ color, size }) => <MaterialIcons name="account-tree" size={size} color={color} />,
+            }}
+          />
+          <Tabs.Screen
+            name="organigrama-visual"
+            options={{
+              title: "Vista Org.",
+              tabBarIcon: ({ color, size }) => <MaterialIcons name="hub" size={size} color={color} />,
+            }}
+          />
+          <Tabs.Screen
+            name="kpis"
+            options={{
+              title: "KPIs",
+              tabBarIcon: ({ color, size }) => <MaterialIcons name="bar-chart" size={size} color={color} />,
+            }}
+          />
+          <Tabs.Screen
+            name="dofa"
+            options={{
+              title: "DOFA",
+              tabBarIcon: ({ color, size }) => <MaterialIcons name="search" size={size} color={color} />,
+            }}
+          />
+          <Tabs.Screen
+            name="interacciones"
+            options={{
+              title: "Interacciones",
+              tabBarIcon: ({ color, size }) => <MaterialIcons name="swap-horiz" size={size} color={color} />,
+            }}
+          />
+          <Tabs.Screen
+            name="exportar"
+            options={{
+              title: "Exportar",
+              tabBarIcon: ({ color, size }) => <MaterialIcons name="download" size={size} color={color} />,
+            }}
+          />
+          {/* Admin-only tab: visible only for admin and superadmin roles */}
+          <Tabs.Screen
+            name="admin-usuarios"
+            options={{
+              title: "Usuarios",
+              tabBarIcon: ({ color, size }) => <MaterialIcons name="manage-accounts" size={size} color={color} />,
+              href: isAdmin ? undefined : null,
+            }}
+          />
+        </Tabs>
+      </AuthorizationGate>
+    </LisRoleContext.Provider>
   );
 }
 
@@ -224,10 +243,15 @@ const styles = StyleSheet.create({
   gateContainer: {
     flex: 1,
     backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
   },
   colorStrip: {
     flexDirection: "row",
     height: 6,
+    width: "100%",
+    position: "absolute",
+    top: 0,
   },
   colorBlock: {
     flex: 1,

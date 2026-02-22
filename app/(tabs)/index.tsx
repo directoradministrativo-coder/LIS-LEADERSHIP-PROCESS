@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { router } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
 import { Storage } from "@/lib/storage";
+import { useLisRole } from "./_layout";
 
 const PROFILE_KEY = "lis_active_profile";
 
@@ -26,9 +27,10 @@ export default function HomeScreen() {
   const [tempName, setTempName] = useState("");
   const [activeProfile, setActiveProfile] = useState<"user" | "admin">("user");
 
-  const userRole = (user as any)?.role as string | undefined;
-  const isSuperAdmin = userRole === "superadmin";
-  const isAdmin = userRole === "admin" || userRole === "superadmin";
+  // Use the LIS-table role from context (set by AuthorizationGate after DB check)
+  const lisRole = useLisRole();
+  const isSuperAdmin = lisRole === "superadmin";
+  const isAdmin = lisRole === "admin" || lisRole === "superadmin";
 
   useEffect(() => {
     Storage.getItem(PROFILE_KEY).then((p: string | null) => {
@@ -37,8 +39,9 @@ export default function HomeScreen() {
   }, []);
 
   const handleLogout = async () => {
-    // Clear saved profile so SuperAdmin sees the selector next time
+    // Clear saved profile and role so SuperAdmin sees the selector next time
     await Storage.removeItem(PROFILE_KEY);
+    await Storage.removeItem("lis_user_role");
     await logout();
     // Force navigation to login after logout
     router.replace("/login" as any);

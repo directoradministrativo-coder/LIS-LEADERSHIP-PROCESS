@@ -132,3 +132,8 @@
 - [x] Bug: botón "Salir" no redirige a la pantalla de login
 - [x] Bug: botón "Volver al inicio" en pantalla de acceso no autorizado no redirige al login
 - [x] Agregar director.planeacion@lis.com.co como superadmin
+
+## Bug Fix v7 - Visibilidad Gestión de Usuarios
+- [x] Bug: pestaña "Usuarios" no visible para admin/superadmin (isAdmin basado en rol OAuth, no en tabla LIS)
+- [x] Corregir: usar rol del checkAuthorization (tabla LIS) para mostrar/ocultar pestaña Usuarios
+- [x] Verificar que botón de configuración en header navega correctamente a pestaña Usuarios
