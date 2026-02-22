@@ -13,9 +13,16 @@ const PROFILE_KEY = "lis_active_profile";
 // ─── Authorization Gate ───────────────────────────────────────────────────────
 
 function AuthorizationGate({ children }: { children: React.ReactNode }) {
-  const { user, isAuthenticated, loading } = useAuth();
+  const { user, isAuthenticated, loading, logout } = useAuth();
   const [authState, setAuthState] = useState<"checking" | "authorized" | "unauthorized">("checking");
   const [profileChecked, setProfileChecked] = useState(false);
+
+  const handleUnauthorizedBack = async () => {
+    // Full logout: clear session cookie + storage, then go to login
+    try { await logout(); } catch { /* ignore */ }
+    await Storage.removeItem(PROFILE_KEY);
+    router.replace("/login" as any);
+  };
 
   const checkAuth = trpc.auth2.checkAuthorization.useQuery(undefined, {
     enabled: isAuthenticated && !loading,
@@ -80,7 +87,7 @@ function AuthorizationGate({ children }: { children: React.ReactNode }) {
           </Text>
           <TouchableOpacity
             style={styles.logoutBtn}
-            onPress={() => router.replace("/login" as any)}
+            onPress={handleUnauthorizedBack}
           >
             <MaterialIcons name="logout" size={18} color="#FFFFFF" />
             <Text style={styles.logoutBtnText}>Volver al inicio</Text>

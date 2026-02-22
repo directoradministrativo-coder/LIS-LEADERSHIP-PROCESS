@@ -127,3 +127,8 @@
 ## Bug Fix v5 - Login
 - [ ] Corregir bug: app queda atascada en "Iniciando sesión..." sin redirigir al login cuando no hay sesión
 - [ ] Agregar timeout/fallback: si en 3s no hay sesión, redirigir automáticamente a /login
+
+## Bug Fix v6 - Navegación y Usuarios
+- [x] Bug: botón "Salir" no redirige a la pantalla de login
+- [x] Bug: botón "Volver al inicio" en pantalla de acceso no autorizado no redirige al login
+- [x] Agregar director.planeacion@lis.com.co como superadmin

@@ -39,7 +39,9 @@ export default function HomeScreen() {
   const handleLogout = async () => {
     // Clear saved profile so SuperAdmin sees the selector next time
     await Storage.removeItem(PROFILE_KEY);
-    logout();
+    await logout();
+    // Force navigation to login after logout
+    router.replace("/login" as any);
   };
 
   const processQuery = trpc.process.getOrCreate.useQuery(undefined, {
