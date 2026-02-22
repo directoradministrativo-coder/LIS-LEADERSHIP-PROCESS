@@ -207,3 +207,24 @@
 - [x] Confirmación antes de restaurar
 - [x] Badge "RESTAURADO" para registros ya recuperados
 - [x] Tab "Historial" visible solo para admin/superadmin
+
+## Feature v12 - Auditoría Extendida + Filtros + Exportación
+
+### Auditoría de actualizaciones
+- [x] Interceptar updateKPI para guardar oldData/newData en auditLog
+- [x] Interceptar updateCollaborator para guardar oldData/newData en auditLog
+- [x] Interceptar adminUpdateProject para guardar oldData/newData con diff de cambios
+- [x] Interceptar updateInteractionTask para guardar oldData/newData en auditLog
+
+### Filtro por área/líder en historial
+- [x] Endpoint audit.list acepta filtro por processName
+- [x] Endpoint audit.listProcessNames: lista de áreas/procesos únicos para dropdown
+- [x] Pantalla admin-historial.tsx: dropdown/selector de área/líder
+- [x] Vista de diff: mostrar campos que cambiaron (anterior → nuevo) para acciones update
+- [x] Vista de snapshot para registros eliminados
+
+### Exportación de historial a Excel
+- [x] Función getAuditLogsExportData en db.ts
+- [x] Endpoint export.auditLog en routers.ts (solo admin)
+- [x] Hoja "Historial" en buildExcelWorkbook en excel-export.ts
+- [x] Botón "Descargar Historial" en pantalla exportar.tsx (solo admin)

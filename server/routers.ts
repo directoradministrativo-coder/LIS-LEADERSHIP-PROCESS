@@ -62,8 +62,8 @@ export const appRouter = router({
       }),
     update: protectedProcedure
       .input(z.object({ id: z.number(), name: z.string().optional(), position: z.string().optional(), functionsVisible: z.boolean().optional() }))
-      .mutation(({ input }) => {
-        return db.updateCollaborator(input.id, input);
+      .mutation(({ ctx, input }) => {
+        return db.updateCollaborator(input.id, input, { userId: ctx.user.id, userName: ctx.user.name ?? undefined, userEmail: ctx.user.email ?? undefined });
       }),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
@@ -203,8 +203,8 @@ export const appRouter = router({
         ansType: z.enum(["dias_calendario", "dias_habiles", "semanas", "meses"]).optional().nullable(),
         ansCompliance: z.number().min(1).max(5).optional().nullable(),
       }))
-      .mutation(({ input }) => {
-        return db.updateInteractionTask(input.id, input);
+      .mutation(({ ctx, input }) => {
+        return db.updateInteractionTask(input.id, input, { userId: ctx.user.id, userName: ctx.user.name ?? undefined, userEmail: ctx.user.email ?? undefined });
       }),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
@@ -294,7 +294,7 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
         const { id, ...data } = input;
-        return db.adminUpdateProject(id, data);
+        return db.adminUpdateProject(id, data, { userId: ctx.user.id, userName: ctx.user.name ?? undefined, userEmail: ctx.user.email ?? undefined });
       }),
     // Get consolidated progress for all users
     getConsolidatedProgress: protectedProcedure.query(async ({ ctx }) => {
@@ -425,6 +425,7 @@ export const appRouter = router({
         tableName: z.string().optional(),
         action: z.enum(["create", "update", "delete"]).optional(),
         processId: z.number().optional(),
+        processName: z.string().optional(),
         limit: z.number().optional(),
         offset: z.number().optional(),
       }))
@@ -432,6 +433,11 @@ export const appRouter = router({
         if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
         return db.getAuditLogs(input);
       }),
+    // Get list of all process names for filter dropdown
+    listProcessNames: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
+      return db.getAuditProcessNames();
+    }),
     restore: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
@@ -461,6 +467,11 @@ export const appRouter = router({
     allProcesses: protectedProcedure.query(async ({ ctx }) => {
       if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
       return db.getAllProcessesData();
+    }),
+    // Admin: export audit log
+    auditLog: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
+      return db.getAuditLogsExportData();
     }),
   }),
 });

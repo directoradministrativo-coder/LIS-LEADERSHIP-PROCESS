@@ -157,6 +157,7 @@ export async function getAuditLogs(filters: {
   tableName?: string;
   action?: "create" | "update" | "delete";
   processId?: number;
+  processName?: string;
   limit?: number;
   offset?: number;
 }) {
@@ -167,6 +168,7 @@ export async function getAuditLogs(filters: {
   if (filters.tableName) conditions.push(eq(auditLog.tableName, filters.tableName));
   if (filters.action) conditions.push(eq(auditLog.action, filters.action));
   if (filters.processId) conditions.push(eq(auditLog.processId, filters.processId));
+  if (filters.processName) conditions.push(eq(auditLog.processName, filters.processName));
 
   const limit = filters.limit ?? 50;
   const offset = filters.offset ?? 0;
@@ -181,6 +183,16 @@ export async function getAuditLogs(filters: {
   const total = Number(countResult[0]?.count ?? 0);
 
   return { logs, total };
+}
+
+export async function getAuditProcessNames() {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .selectDistinct({ processName: auditLog.processName })
+    .from(auditLog)
+    .where(sql`${auditLog.processName} IS NOT NULL`);
+  return rows.map((r) => r.processName).filter(Boolean) as string[];
 }
 
 export async function markAuditRestored(id: number) {
@@ -306,10 +318,15 @@ export async function createCollaborator(userId: number, data: { hierarchyId: nu
   return created[0];
 }
 
-export async function updateCollaborator(id: number, data: { name?: string; position?: string; functionsVisible?: boolean }) {
+export async function updateCollaborator(id: number, data: { name?: string; position?: string; functionsVisible?: boolean }, ctx: AuditContext = {}) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  const snap = await db.select().from(orgCollaborators).where(eq(orgCollaborators.id, id)).limit(1);
   await db.update(orgCollaborators).set(data).where(eq(orgCollaborators.id, id));
+  if (snap.length > 0 && (data.name !== undefined || data.position !== undefined)) {
+    await writeAuditLog("orgCollaborators", id, "update", snap[0], { ...snap[0], ...data },
+      `Modificó colaborador "${snap[0].name}"`, ctx);
+  }
 }
 
 export async function deleteCollaborator(id: number, ctx: { userId?: number; userName?: string; userEmail?: string; processId?: number; processName?: string } = {}) {
@@ -379,10 +396,15 @@ export async function createKPI(userId: number, data: { name: string; objective:
   return created[0];
 }
 
-export async function updateKPI(id: number, data: Partial<{ name: string; objective: string; frequency: "dia" | "semana" | "mes"; formula: string; responsible: string }>) {
+export async function updateKPI(id: number, data: Partial<{ name: string; objective: string; frequency: "dia" | "semana" | "mes"; formula: string; responsible: string }>, ctx: AuditContext = {}) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  const snap = await db.select().from(kpis).where(eq(kpis.id, id)).limit(1);
   await db.update(kpis).set(data).where(eq(kpis.id, id));
+  if (snap.length > 0) {
+    await writeAuditLog("kpis", id, "update", snap[0], { ...snap[0], ...data },
+      `Modificó KPI "${snap[0].name}"`, ctx);
+  }
 }
 
 export async function deleteKPI(id: number, ctx: { userId?: number; userName?: string; userEmail?: string; processId?: number; processName?: string } = {}) {
@@ -516,10 +538,15 @@ export async function updateInteractionTask(id: number, data: Partial<{
   ansNumber: number | null;
   ansType: "dias_calendario" | "dias_habiles" | "semanas" | "meses" | null;
   ansCompliance: number | null;
-}>) {
+}>, ctx: AuditContext = {}) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+  const snap = await db.select().from(interactionTasks).where(eq(interactionTasks.id, id)).limit(1);
   await db.update(interactionTasks).set(data).where(eq(interactionTasks.id, id));
+  if (snap.length > 0) {
+    await writeAuditLog("interactionTasks", id, "update", snap[0], { ...snap[0], ...data },
+      `Modificó tarea/actividad "${snap[0].taskActivity?.substring(0, 50)}"`, ctx);
+  }
 }
 
 export async function deleteInteractionTask(id: number) {
@@ -898,9 +925,11 @@ export async function adminUpdateProject(projectId: number, data: {
   status?: "por_priorizar" | "en_ejecucion" | "finalizado" | "suspendido" | "cancelado";
   statusObservations?: string | null;
   notificationMessage?: string;
-}) {
+}, ctx: AuditContext = {}) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
+
+  const snap = await db.select().from(projects).where(eq(projects.id, projectId)).limit(1);
 
   const updateData: Parameters<typeof db.update>[0] extends infer T ? Partial<typeof projects.$inferInsert> : never = {};
   if (data.impact !== undefined) {
@@ -927,6 +956,18 @@ export async function adminUpdateProject(projectId: number, data: {
 
   await db.update(projects).set(updateData).where(eq(projects.id, projectId));
   const updated = await db.select().from(projects).where(eq(projects.id, projectId)).limit(1);
+
+  if (snap.length > 0 && updated.length > 0) {
+    const changes: string[] = [];
+    if (data.impact !== undefined && data.impact !== snap[0].impact) changes.push(`Impacto: ${snap[0].impact}→${data.impact}`);
+    if (data.difficulty !== undefined && data.difficulty !== snap[0].difficulty) changes.push(`Dificultad: ${snap[0].difficulty}→${data.difficulty}`);
+    if (data.status !== undefined && data.status !== snap[0].status) changes.push(`Estado: ${snap[0].status}→${data.status}`);
+    const desc = changes.length > 0
+      ? `Admin modificó proyecto "${snap[0].name}": ${changes.join(', ')}`
+      : `Admin actualizó proyecto "${snap[0].name}"`;
+    await writeAuditLog("projects", projectId, "update", snap[0], updated[0], desc, ctx);
+  }
+
   return updated[0];
 }
 
@@ -1173,4 +1214,24 @@ export async function restoreAuditRecord(
   // Mark the audit entry as restored
   await markAuditRestored(auditId);
   return { success: true, tableName: record.tableName, recordId: record.recordId };
+}
+
+// ─── Audit Log Export ─────────────────────────────────────────────────────────
+
+export async function getAuditLogsExportData() {
+  const db = await getDb();
+  if (!db) return [];
+
+  const logs = await db.select().from(auditLog).orderBy(desc(auditLog.createdAt)).limit(2000);
+  return logs.map((log) => ({
+    id: log.id,
+    fecha: log.createdAt ? new Date(log.createdAt).toLocaleString("es-CO") : "",
+    modulo: log.tableName,
+    accion: log.action,
+    descripcion: log.description ?? "",
+    usuario: log.userName ?? "",
+    email: log.userEmail ?? "",
+    area: log.processName ?? "",
+    restaurado: log.isRestored ? "Sí" : "No",
+  }));
 }

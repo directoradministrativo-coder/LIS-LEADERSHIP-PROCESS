@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -25,6 +25,7 @@ type ModuleFilter =
   | "orgCollaborators"
   | "kpis"
   | "processInteractions"
+  | "interactionTasks"
   | "projects";
 
 interface AuditEntry {
@@ -51,6 +52,7 @@ const MODULE_LABELS: Record<string, string> = {
   orgCollaborators: "Colaboradores",
   kpis: "KPIs",
   processInteractions: "Proveedores/Clientes",
+  interactionTasks: "Tareas de Interacción",
   projects: "Proyectos",
 };
 
@@ -59,6 +61,52 @@ const ACTION_LABELS: Record<string, { label: string; color: string }> = {
   update: { label: "Modificación", color: "#F59E0B" },
   delete: { label: "Eliminación", color: "#EF4444" },
 };
+
+// Field labels for human-readable diff display
+const FIELD_LABELS: Record<string, string> = {
+  name: "Nombre",
+  objective: "Objetivo",
+  frequency: "Frecuencia",
+  formula: "Fórmula",
+  responsible: "Responsable",
+  position: "Cargo",
+  impact: "Impacto",
+  difficulty: "Dificultad",
+  subtotal: "Subtotal",
+  status: "Estado",
+  statusObservations: "Observaciones",
+  taskActivity: "Actividad",
+  documentRoute: "Ruta Documento",
+  responsibleRole: "Rol Responsable",
+  ansCompliance: "Cumplimiento",
+  description: "Descripción",
+};
+
+const IGNORED_FIELDS = new Set([
+  "id", "processId", "hierarchyId", "collaboratorId", "interactionId",
+  "createdAt", "updatedAt", "hasNotification", "notificationMessage",
+  "adminModifiedAt", "functionsVisible", "isRestored",
+]);
+
+function computeDiff(oldData: any, newData: any): Array<{ field: string; label: string; before: string; after: string }> {
+  if (!oldData || !newData || typeof oldData !== "object" || typeof newData !== "object") return [];
+  const diffs: Array<{ field: string; label: string; before: string; after: string }> = [];
+  const allKeys = new Set([...Object.keys(oldData), ...Object.keys(newData)]);
+  for (const key of allKeys) {
+    if (IGNORED_FIELDS.has(key)) continue;
+    const before = String(oldData[key] ?? "—");
+    const after = String(newData[key] ?? "—");
+    if (before !== after) {
+      diffs.push({
+        field: key,
+        label: FIELD_LABELS[key] ?? key,
+        before,
+        after,
+      });
+    }
+  }
+  return diffs;
+}
 
 function formatDate(date: string | Date): string {
   const d = new Date(date);
@@ -94,9 +142,16 @@ function DetailModal({
   const actionInfo = ACTION_LABELS[entry.action] ?? { label: entry.action, color: "#687076" };
 
   let parsedOld: any = null;
-  try {
-    if (entry.oldData) parsedOld = JSON.parse(entry.oldData);
-  } catch {}
+  let parsedNew: any = null;
+  try { if (entry.oldData) parsedOld = JSON.parse(entry.oldData); } catch {}
+  try { if (entry.newData) parsedNew = JSON.parse(entry.newData); } catch {}
+
+  const diffs = entry.action === "update" ? computeDiff(parsedOld, parsedNew) : [];
+
+  // For delete: extract the main object to display
+  const snapshotObj = parsedOld
+    ? (parsedOld.hierarchy ?? parsedOld.collaborator ?? parsedOld.interaction ?? parsedOld)
+    : null;
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
@@ -114,10 +169,19 @@ function DetailModal({
 
           <ScrollView style={styles.modalBody}>
             {/* Meta info */}
-            <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.infoLabel, { color: colors.muted }]}>Módulo</Text>
-              <Text style={[styles.infoValue, { color: colors.foreground }]}>{moduleLabel}</Text>
-            </View>
+            {[
+              { label: "Módulo", value: moduleLabel },
+              { label: "Usuario", value: entry.userName ?? "Desconocido" },
+              { label: "Área/Proceso", value: entry.processName ?? "—" },
+              { label: "Fecha", value: formatDate(entry.createdAt) },
+            ].map(({ label, value }) => (
+              <View key={label} style={[styles.infoRow, { borderBottomColor: colors.border }]}>
+                <Text style={[styles.infoLabel, { color: colors.muted }]}>{label}</Text>
+                <Text style={[styles.infoValue, { color: colors.foreground }]}>{value}</Text>
+              </View>
+            ))}
+
+            {/* Action badge */}
             <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
               <Text style={[styles.infoLabel, { color: colors.muted }]}>Acción</Text>
               <View style={[styles.actionBadge, { backgroundColor: actionInfo.color + "20" }]}>
@@ -125,24 +189,6 @@ function DetailModal({
                   {actionInfo.label}
                 </Text>
               </View>
-            </View>
-            <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.infoLabel, { color: colors.muted }]}>Usuario</Text>
-              <Text style={[styles.infoValue, { color: colors.foreground }]}>
-                {entry.userName ?? "Desconocido"}
-              </Text>
-            </View>
-            <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.infoLabel, { color: colors.muted }]}>Área/Proceso</Text>
-              <Text style={[styles.infoValue, { color: colors.foreground }]}>
-                {entry.processName ?? "—"}
-              </Text>
-            </View>
-            <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.infoLabel, { color: colors.muted }]}>Fecha</Text>
-              <Text style={[styles.infoValue, { color: colors.foreground }]}>
-                {formatDate(entry.createdAt)}
-              </Text>
             </View>
 
             {/* Description */}
@@ -152,26 +198,51 @@ function DetailModal({
               </View>
             ) : null}
 
-            {/* Snapshot preview */}
-            {parsedOld && entry.action === "delete" && (
+            {/* DIFF view for updates */}
+            {entry.action === "update" && diffs.length > 0 && (
+              <View style={{ marginTop: 16 }}>
+                <Text style={[styles.sectionLabel, { color: colors.muted }]}>
+                  Campos modificados ({diffs.length})
+                </Text>
+                {diffs.map((diff) => (
+                  <View key={diff.field} style={[styles.diffRow, { borderColor: colors.border, backgroundColor: colors.background }]}>
+                    <Text style={[styles.diffField, { color: colors.muted }]}>{diff.label}</Text>
+                    <View style={styles.diffValues}>
+                      <View style={[styles.diffBefore, { backgroundColor: "#EF444415" }]}>
+                        <Text style={{ color: "#EF4444", fontSize: 12 }}>Antes: {diff.before}</Text>
+                      </View>
+                      <Text style={{ color: colors.muted, fontSize: 12 }}>→</Text>
+                      <View style={[styles.diffAfter, { backgroundColor: "#22C55E15" }]}>
+                        <Text style={{ color: "#22C55E", fontSize: 12 }}>Después: {diff.after}</Text>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {entry.action === "update" && diffs.length === 0 && parsedOld && (
+              <View style={[styles.descBox, { backgroundColor: colors.background, borderColor: colors.border, marginTop: 16 }]}>
+                <Text style={[styles.descText, { color: colors.muted }]}>
+                  No se detectaron cambios en campos visibles.
+                </Text>
+              </View>
+            )}
+
+            {/* Snapshot for deletes */}
+            {entry.action === "delete" && snapshotObj && typeof snapshotObj === "object" && !Array.isArray(snapshotObj) && (
               <View style={{ marginTop: 16 }}>
                 <Text style={[styles.sectionLabel, { color: colors.muted }]}>
                   Datos del registro eliminado
                 </Text>
                 <View style={[styles.snapshotBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  {Object.entries(
-                    typeof parsedOld === "object" && !Array.isArray(parsedOld) && parsedOld.hierarchy
-                      ? parsedOld.hierarchy
-                      : typeof parsedOld === "object" && !Array.isArray(parsedOld) && parsedOld.collaborator
-                      ? parsedOld.collaborator
-                      : typeof parsedOld === "object" && !Array.isArray(parsedOld) && parsedOld.interaction
-                      ? parsedOld.interaction
-                      : parsedOld
-                  )
-                    .filter(([k]) => !["id", "processId", "hierarchyId", "collaboratorId", "interactionId", "createdAt", "updatedAt"].includes(k))
+                  {Object.entries(snapshotObj)
+                    .filter(([k]) => !IGNORED_FIELDS.has(k))
                     .map(([key, value]) => (
                       <View key={key} style={styles.snapshotRow}>
-                        <Text style={[styles.snapshotKey, { color: colors.muted }]}>{key}:</Text>
+                        <Text style={[styles.snapshotKey, { color: colors.muted }]}>
+                          {FIELD_LABELS[key] ?? key}:
+                        </Text>
                         <Text style={[styles.snapshotVal, { color: colors.foreground }]}>
                           {String(value ?? "—")}
                         </Text>
@@ -224,16 +295,17 @@ export default function AdminHistorialScreen() {
 
   const [moduleFilter, setModuleFilter] = useState<ModuleFilter>("all");
   const [actionFilter, setActionFilter] = useState<ActionFilter>("all");
+  const [areaFilter, setAreaFilter] = useState<string>("all");
+  const [areaPickerVisible, setAreaPickerVisible] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<AuditEntry | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Only admins can access this screen
   const userRole = (user as any)?.role;
   if (userRole !== "admin" && userRole !== "superadmin") {
     return (
       <ScreenContainer className="items-center justify-center p-6">
-        <Text style={{ color: colors.error, fontSize: 16, textAlign: "center" }}>
+        <Text style={{ color: "#EF4444", fontSize: 16, textAlign: "center" }}>
           Acceso restringido. Solo administradores pueden ver el historial.
         </Text>
       </ScreenContainer>
@@ -243,10 +315,13 @@ export default function AdminHistorialScreen() {
   const queryInput = {
     tableName: moduleFilter !== "all" ? moduleFilter : undefined,
     action: actionFilter !== "all" ? (actionFilter as "create" | "update" | "delete") : undefined,
-    limit: 100,
+    processName: areaFilter !== "all" ? areaFilter : undefined,
+    limit: 150,
   };
 
   const { data, isLoading, refetch } = trpc.audit.list.useQuery(queryInput);
+  const { data: processNames } = trpc.audit.listProcessNames.useQuery();
+
   const restoreMutation = trpc.audit.restore.useMutation({
     onSuccess: () => {
       Alert.alert("Restaurado", "El registro fue restaurado exitosamente.");
@@ -265,11 +340,7 @@ export default function AdminHistorialScreen() {
         "¿Está seguro de que desea restaurar este registro? Se volverá a crear en el sistema.",
         [
           { text: "Cancelar", style: "cancel" },
-          {
-            text: "Restaurar",
-            style: "default",
-            onPress: () => restoreMutation.mutate({ id }),
-          },
+          { text: "Restaurar", onPress: () => restoreMutation.mutate({ id }) },
         ]
       );
     },
@@ -284,6 +355,7 @@ export default function AdminHistorialScreen() {
 
   const logs: AuditEntry[] = (data?.logs ?? []) as AuditEntry[];
   const total = data?.total ?? 0;
+  const areas: string[] = processNames ?? [];
 
   const renderItem = ({ item }: { item: AuditEntry }) => {
     const actionInfo = ACTION_LABELS[item.action] ?? { label: item.action, color: "#687076" };
@@ -307,14 +379,19 @@ export default function AdminHistorialScreen() {
       >
         <View style={styles.cardTop}>
           <View style={[styles.actionBadge, { backgroundColor: actionInfo.color + "20" }]}>
-            <Text style={{ color: actionInfo.color, fontWeight: "700", fontSize: 11 }}>
+            <Text style={{ color: actionInfo.color, fontWeight: "700", fontSize: 10 }}>
               {actionInfo.label.toUpperCase()}
             </Text>
           </View>
           <Text style={[styles.cardModule, { color: colors.muted }]}>{moduleLabel}</Text>
+          {item.processName ? (
+            <Text style={[styles.cardArea, { color: colors.primary }]} numberOfLines={1}>
+              {item.processName}
+            </Text>
+          ) : null}
           {item.isRestored && (
             <View style={[styles.restoredSmall, { backgroundColor: "#22C55E20" }]}>
-              <Text style={{ color: "#22C55E", fontSize: 10, fontWeight: "600" }}>RESTAURADO</Text>
+              <Text style={{ color: "#22C55E", fontSize: 10, fontWeight: "600" }}>REST.</Text>
             </View>
           )}
         </View>
@@ -344,7 +421,7 @@ export default function AdminHistorialScreen() {
             Historial de Cambios
           </Text>
           <Text style={[styles.headerSub, { color: colors.muted }]}>
-            {total} registro{total !== 1 ? "s" : ""} encontrado{total !== 1 ? "s" : ""}
+            {total} registro{total !== 1 ? "s" : ""}
           </Text>
         </View>
       </View>
@@ -354,28 +431,22 @@ export default function AdminHistorialScreen() {
         horizontal
         showsHorizontalScrollIndicator={false}
         style={[styles.filterRow, { borderBottomColor: colors.border }]}
-        contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
+        contentContainerStyle={{ paddingHorizontal: 16, gap: 8, alignItems: "center" }}
       >
-        {(["all", "orgHierarchies", "orgCollaborators", "kpis", "processInteractions", "projects"] as ModuleFilter[]).map(
+        {(["all", "orgHierarchies", "orgCollaborators", "kpis", "processInteractions", "interactionTasks", "projects"] as ModuleFilter[]).map(
           (mod) => (
             <TouchableOpacity
               key={mod}
               style={[
                 styles.filterChip,
                 {
-                  backgroundColor: moduleFilter === mod ? colors.primary : colors.surface,
-                  borderColor: moduleFilter === mod ? colors.primary : colors.border,
+                  backgroundColor: moduleFilter === mod ? "#1B4F9B" : colors.surface,
+                  borderColor: moduleFilter === mod ? "#1B4F9B" : colors.border,
                 },
               ]}
               onPress={() => setModuleFilter(mod)}
             >
-              <Text
-                style={{
-                  color: moduleFilter === mod ? "#fff" : colors.foreground,
-                  fontSize: 12,
-                  fontWeight: "600",
-                }}
-              >
+              <Text style={{ color: moduleFilter === mod ? "#fff" : colors.foreground, fontSize: 11, fontWeight: "600" }}>
                 {mod === "all" ? "Todos" : MODULE_LABELS[mod]}
               </Text>
             </TouchableOpacity>
@@ -383,34 +454,47 @@ export default function AdminHistorialScreen() {
         )}
       </ScrollView>
 
-      {/* Action filter */}
-      <View style={[styles.actionFilterRow, { borderBottomColor: colors.border }]}>
-        {(["all", "delete", "update", "create"] as ActionFilter[]).map((act) => {
-          const info = act === "all" ? { label: "Todas", color: colors.primary } : ACTION_LABELS[act];
-          return (
-            <TouchableOpacity
-              key={act}
-              style={[
-                styles.actionFilterBtn,
-                {
-                  backgroundColor: actionFilter === act ? info.color + "20" : "transparent",
-                  borderColor: actionFilter === act ? info.color : colors.border,
-                },
-              ]}
-              onPress={() => setActionFilter(act)}
-            >
-              <Text style={{ color: actionFilter === act ? info.color : colors.muted, fontSize: 12, fontWeight: "600" }}>
-                {act === "all" ? "Todas" : ACTION_LABELS[act].label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+      {/* Action + Area filters row */}
+      <View style={[styles.secondFilterRow, { borderBottomColor: colors.border }]}>
+        {/* Action filter */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ gap: 6, paddingRight: 8 }}>
+          {(["all", "delete", "update", "create"] as ActionFilter[]).map((act) => {
+            const info = act === "all" ? { label: "Todas", color: "#1B4F9B" } : ACTION_LABELS[act];
+            return (
+              <TouchableOpacity
+                key={act}
+                style={[
+                  styles.actionFilterBtn,
+                  {
+                    backgroundColor: actionFilter === act ? info.color + "20" : "transparent",
+                    borderColor: actionFilter === act ? info.color : colors.border,
+                  },
+                ]}
+                onPress={() => setActionFilter(act)}
+              >
+                <Text style={{ color: actionFilter === act ? info.color : colors.muted, fontSize: 11, fontWeight: "600" }}>
+                  {act === "all" ? "Todas" : ACTION_LABELS[act].label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        {/* Area filter button */}
+        <TouchableOpacity
+          style={[styles.areaBtn, { borderColor: areaFilter !== "all" ? "#1B4F9B" : colors.border, backgroundColor: areaFilter !== "all" ? "#1B4F9B15" : "transparent" }]}
+          onPress={() => setAreaPickerVisible(true)}
+        >
+          <Text style={{ color: areaFilter !== "all" ? "#1B4F9B" : colors.muted, fontSize: 11, fontWeight: "600" }} numberOfLines={1}>
+            {areaFilter !== "all" ? areaFilter : "Área ▾"}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* List */}
       {isLoading ? (
         <View style={styles.center}>
-          <ActivityIndicator color={colors.primary} size="large" />
+          <ActivityIndicator color="#1B4F9B" size="large" />
           <Text style={[styles.loadingText, { color: colors.muted }]}>Cargando historial...</Text>
         </View>
       ) : logs.length === 0 ? (
@@ -428,10 +512,44 @@ export default function AdminHistorialScreen() {
           renderItem={renderItem}
           contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 40 }}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1B4F9B" />
           }
         />
       )}
+
+      {/* Area picker modal */}
+      <Modal visible={areaPickerVisible} animationType="slide" transparent onRequestClose={() => setAreaPickerVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.pickerContainer, { backgroundColor: colors.surface }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.modalTitle, { color: colors.foreground }]}>Filtrar por Área</Text>
+              <TouchableOpacity onPress={() => setAreaPickerVisible(false)}>
+                <Text style={{ color: colors.muted, fontSize: 20 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              {["all", ...areas].map((area) => (
+                <TouchableOpacity
+                  key={area}
+                  style={[
+                    styles.pickerItem,
+                    { borderBottomColor: colors.border, backgroundColor: areaFilter === area ? "#1B4F9B10" : "transparent" },
+                  ]}
+                  onPress={() => {
+                    setAreaFilter(area);
+                    setAreaPickerVisible(false);
+                  }}
+                >
+                  <Text style={{ color: areaFilter === area ? "#1B4F9B" : colors.foreground, fontWeight: areaFilter === area ? "700" : "400" }}>
+                    {area === "all" ? "Todas las áreas" : area}
+                  </Text>
+                  {areaFilter === area && <Text style={{ color: "#1B4F9B" }}>✓</Text>}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Detail Modal */}
       <DetailModal
@@ -453,36 +571,40 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 12,
     borderBottomWidth: 0.5,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
   },
   headerTitle: { fontSize: 20, fontWeight: "700" },
   headerSub: { fontSize: 12, marginTop: 2 },
   filterRow: {
     borderBottomWidth: 0.5,
-    paddingVertical: 10,
     maxHeight: 52,
+    paddingVertical: 8,
   },
   filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 20,
     borderWidth: 1,
   },
-  actionFilterRow: {
+  secondFilterRow: {
     flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 8,
-    gap: 8,
     borderBottomWidth: 0.5,
+    gap: 8,
   },
   actionFilterBtn: {
-    flex: 1,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 8,
     borderWidth: 1,
-    alignItems: "center",
+  },
+  areaBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    maxWidth: 110,
   },
   card: {
     borderRadius: 12,
@@ -494,20 +616,22 @@ const styles = StyleSheet.create({
   cardTop: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
+    flexWrap: "wrap",
   },
   actionBadge: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: 6,
   },
-  cardModule: { fontSize: 12, flex: 1 },
+  cardModule: { fontSize: 11 },
+  cardArea: { fontSize: 11, fontWeight: "600", flex: 1 },
   restoredSmall: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 5,
     paddingVertical: 2,
     borderRadius: 4,
   },
-  cardDesc: { fontSize: 14, fontWeight: "500", lineHeight: 20 },
+  cardDesc: { fontSize: 13, fontWeight: "500", lineHeight: 19 },
   cardMeta: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -532,7 +656,20 @@ const styles = StyleSheet.create({
   modalContainer: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: "85%",
+    maxHeight: "88%",
+  },
+  pickerContainer: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "70%",
+  },
+  pickerItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 0.5,
   },
   modalHeader: {
     flexDirection: "row",
@@ -560,7 +697,39 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   descText: { fontSize: 14, lineHeight: 20 },
-  sectionLabel: { fontSize: 12, fontWeight: "600", marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    marginBottom: 8,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  diffRow: {
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 10,
+    marginBottom: 8,
+    gap: 6,
+  },
+  diffField: { fontSize: 12, fontWeight: "600" },
+  diffValues: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexWrap: "wrap",
+  },
+  diffBefore: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    flex: 1,
+  },
+  diffAfter: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    flex: 1,
+  },
   snapshotBox: {
     padding: 12,
     borderRadius: 10,
@@ -568,7 +737,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   snapshotRow: { flexDirection: "row", gap: 8 },
-  snapshotKey: { fontSize: 12, width: 100 },
+  snapshotKey: { fontSize: 12, width: 110 },
   snapshotVal: { fontSize: 12, flex: 1 },
   restoredBadge: {
     marginTop: 16,

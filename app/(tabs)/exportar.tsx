@@ -35,6 +35,7 @@ export default function ExportarScreen() {
 
   // Admin queries
   const allProcessesQuery = trpc.admin.getAllProcesses.useQuery(undefined, { enabled: isAdmin });
+  const auditLogQuery = trpc.export.auditLog.useQuery(undefined, { enabled: isAdmin });
 
   const isLoading =
     processQuery.isLoading ||
@@ -313,6 +314,78 @@ export default function ExportarScreen() {
             ? "El archivo incluye todas las hojas con el levantamiento completo del proceso, listo para compartir o archivar."
             : "El archivo consolidado incluye todos los procesos seleccionados en hojas separadas."}
         </Text>
+
+        {/* ── ADMIN: EXPORT AUDIT LOG ── */}
+        {isAdmin && (
+          <>
+            <Text style={[styles.sectionTitle, { marginTop: 20 }]}>HISTORIAL DE CAMBIOS</Text>
+            <TouchableOpacity
+              style={[styles.exportBtn, { backgroundColor: "#7C3AED", marginTop: 0 }, (isExporting || auditLogQuery.isLoading) && styles.exportBtnDisabled]}
+              onPress={async () => {
+                const auditData = auditLogQuery.data;
+                if (!auditData || auditData.length === 0) {
+                  Alert.alert("Sin datos", "No hay registros de auditoría para exportar.");
+                  return;
+                }
+                setIsExporting(true);
+                try {
+                  const XLSX = require("xlsx");
+                  const wb = XLSX.utils.book_new();
+                  const moduleLabels: Record<string, string> = {
+                    orgHierarchies: "Organigrama",
+                    orgCollaborators: "Colaboradores",
+                    kpis: "KPIs",
+                    processInteractions: "Proveedores/Clientes",
+                    interactionTasks: "Tareas de Interacción",
+                    projects: "Proyectos",
+                  };
+                  const actionLabels: Record<string, string> = {
+                    create: "Creación",
+                    update: "Modificación",
+                    delete: "Eliminación",
+                  };
+                  const rows: any[][] = [
+                    ["HISTORIAL DE CAMBIOS — LIS", "", "", "", "", "", "", "", ""],
+                    [`Exportado: ${new Date().toLocaleDateString("es-CO")}`, "", "", "", "", "", "", "", ""],
+                    [""],
+                    ["#", "Fecha", "Módulo", "Acción", "Descripción", "Usuario", "Email", "Área/Proceso", "Restaurado"],
+                    ...auditData.map((e: any, i: number) => [
+                      i + 1,
+                      e.fecha,
+                      moduleLabels[e.modulo] ?? e.modulo,
+                      actionLabels[e.accion] ?? e.accion,
+                      e.descripcion,
+                      e.usuario,
+                      e.email,
+                      e.area,
+                      e.restaurado,
+                    ]),
+                  ];
+                  const ws = XLSX.utils.aoa_to_sheet(rows);
+                  ws["!cols"] = [5, 20, 20, 14, 50, 25, 30, 25, 10].map(w => ({ wch: w }));
+                  XLSX.utils.book_append_sheet(wb, ws, "Historial");
+                  const filename = `LIS_Historial_${new Date().toISOString().split("T")[0]}.xlsx`;
+                  await downloadExcel(wb, filename);
+                } catch (e) {
+                  Alert.alert("Error", "No se pudo generar el archivo de historial.");
+                } finally {
+                  setIsExporting(false);
+                }
+              }}
+              disabled={isExporting || auditLogQuery.isLoading}
+            >
+              <View style={styles.exportBtnContent}>
+                <Text style={styles.exportBtnIcon}>📋</Text>
+                <Text style={styles.exportBtnText}>
+                  Descargar Historial ({auditLogQuery.data?.length ?? 0} registros)
+                </Text>
+              </View>
+            </TouchableOpacity>
+            <Text style={styles.exportNote}>
+              Incluye todos los cambios registrados: creaciones, modificaciones y eliminaciones de todos los módulos.
+            </Text>
+          </>
+        )}
 
         <View style={{ height: 40 }} />
       </ScrollView>

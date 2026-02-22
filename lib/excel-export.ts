@@ -32,6 +32,18 @@ type ProjectsData = {
   projects: any[];
 };
 
+type AuditLogEntry = {
+  id: number;
+  fecha: string;
+  modulo: string;
+  accion: string;
+  descripcion: string;
+  usuario: string;
+  email: string;
+  area: string;
+  restaurado: string;
+};
+
 // ============================================================
 // Helpers
 // ============================================================
@@ -76,7 +88,8 @@ export function buildExcelWorkbook(
   kpisData: KPIsData,
   dofaData: DofaData,
   interactionsData: InteractionsData,
-  projectsData?: ProjectsData
+  projectsData?: ProjectsData,
+  auditData?: AuditLogEntry[]
 ): XLSX.WorkBook {
   const wb = XLSX.utils.book_new();
   const processName = orgData.process?.processName ?? "Sin nombre";
@@ -289,6 +302,47 @@ export function buildExcelWorkbook(
     wsProj["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }];
     setColWidths(wsProj, [5, 35, 50, 18, 18, 12, 18]);
     XLSX.utils.book_append_sheet(wb, wsProj, "Proyectos");
+  }
+
+  // ── Sheet 8: Historial de Cambios ─────────────────────────
+  if (auditData && auditData.length > 0) {
+    const auditRows: any[][] = [
+      ["HISTORIAL DE CAMBIOS", "", "", "", "", "", "", "", ""],
+      ["#", "Fecha", "Módulo", "Acción", "Descripción", "Usuario", "Email", "Área/Proceso", "Restaurado"],
+    ];
+
+    const moduleLabels: Record<string, string> = {
+      orgHierarchies: "Organigrama",
+      orgCollaborators: "Colaboradores",
+      kpis: "KPIs",
+      processInteractions: "Proveedores/Clientes",
+      interactionTasks: "Tareas de Interacción",
+      projects: "Proyectos",
+    };
+    const actionLabels: Record<string, string> = {
+      create: "Creación",
+      update: "Modificación",
+      delete: "Eliminación",
+    };
+
+    auditData.forEach((entry, i) => {
+      auditRows.push([
+        i + 1,
+        entry.fecha,
+        moduleLabels[entry.modulo] ?? entry.modulo,
+        actionLabels[entry.accion] ?? entry.accion,
+        entry.descripcion,
+        entry.usuario,
+        entry.email,
+        entry.area,
+        entry.restaurado,
+      ]);
+    });
+
+    const wsAudit = XLSX.utils.aoa_to_sheet(auditRows);
+    wsAudit["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 8 } }];
+    setColWidths(wsAudit, [5, 20, 20, 14, 50, 25, 30, 25, 10]);
+    XLSX.utils.book_append_sheet(wb, wsAudit, "Historial");
   }
 
   return wb;
