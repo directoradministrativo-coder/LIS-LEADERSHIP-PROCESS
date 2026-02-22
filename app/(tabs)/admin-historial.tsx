@@ -26,9 +26,12 @@ type ModuleFilter =
   | "all"
   | "orgHierarchies"
   | "orgCollaborators"
+  | "collaboratorFunctions"
   | "kpis"
+  | "dofaMatrix"
   | "processInteractions"
   | "interactionTasks"
+  | "interactionStrengths"
   | "projects";
 
 interface AuditEntry {
@@ -53,9 +56,12 @@ interface AuditEntry {
 const MODULE_LABELS: Record<string, string> = {
   orgHierarchies: "Organigrama",
   orgCollaborators: "Colaboradores",
+  collaboratorFunctions: "Funciones",
   kpis: "KPIs",
+  dofaMatrix: "DOFA",
   processInteractions: "Proveedores/Clientes",
-  interactionTasks: "Tareas de Interacción",
+  interactionTasks: "Tareas",
+  interactionStrengths: "Fortalezas",
   projects: "Proyectos",
 };
 
@@ -492,7 +498,7 @@ export default function AdminHistorialScreen() {
         style={[styles.filterRow, { borderBottomColor: colors.border }]}
         contentContainerStyle={{ paddingHorizontal: 16, gap: 8, alignItems: "center" }}
       >
-        {(["all", "orgHierarchies", "orgCollaborators", "kpis", "processInteractions", "interactionTasks", "projects"] as ModuleFilter[]).map(
+        {(["all", "orgHierarchies", "orgCollaborators", "collaboratorFunctions", "kpis", "dofaMatrix", "processInteractions", "interactionTasks", "interactionStrengths", "projects"] as ModuleFilter[]).map(
           (mod) => (
             <TouchableOpacity
               key={mod}

@@ -1,0 +1,8 @@
+{
+  "query": "\n-- Limpiar datos relacionados del proceso [3] que tiene 1 registro DOFA huérfano\nDELETE FROM dofaMatrix WHERE processId IN (1, 2, 3, 30001);\nDELETE FROM orgHierarchies WHERE processId IN (1, 2, 3, 30001);\nDELETE FROM orgCollaborators WHERE processId IN (1, 2, 3, 30001);\nDELETE FROM collaboratorFunctions WHERE processId IN (1, 2, 3, 30001);\nDELETE FROM kpis WHERE processId IN (1, 2, 3, 30001);\nDELETE FROM processInteractions WHERE processId IN (1, 2, 3, 30001);\nDELETE FROM projects WHERE processId IN (1, 2, 3, 30001);\nDELETE FROM auditLog WHERE processId IN (1, 2, 3, 30001);\n-- Finalmente eliminar los procesos huérfanos\nDELETE FROM processes WHERE id IN (1, 2, 3, 30001);\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2PdRtrWLd1DC4ZR.b592ac40996f --database koomPuwFyTypz4KywoA68k --execute \n-- Limpiar datos relacionados del proceso [3] que tiene 1 registro DOFA huérfano\nDELETE FROM dofaMatrix WHERE processId IN (1, 2, 3, 30001);\nDELETE FROM orgHierarchies WHERE processId IN (1, 2, 3, 30001);\nDELETE FROM orgCollaborators WHERE processId IN (1, 2, 3, 30001);\nDELETE FROM collaboratorFunctions WHERE processId IN (1, 2, 3, 30001);\nDELETE FROM kpis WHERE processId IN (1, 2, 3, 30001);\nDELETE FROM processInteractions WHERE processId IN (1, 2, 3, 30001);\nDELETE FROM projects WHERE processId IN (1, 2, 3, 30001);\nDELETE FROM auditLog WHERE processId IN (1, 2, 3, 30001);\n-- Finalmente eliminar los procesos huérfanos\nDELETE FROM processes WHERE id IN (1, 2, 3, 30001);\n",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 6: Unknown column 'processid' in 'where clause'"
+  ]
+}

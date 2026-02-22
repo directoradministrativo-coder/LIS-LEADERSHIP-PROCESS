@@ -461,10 +461,9 @@ export async function getDofa(userId: number) {
   };
 }
 
-export async function saveDofa(userId: number, data: { debilidades: string[]; oportunidades: string[]; fortalezas: string[]; amenazas: string[] }) {
+export async function saveDofa(userId: number, data: { debilidades: string[]; oportunidades: string[]; fortalezas: string[]; amenazas: string[] }, ctx: AuditContext = {}) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-
   const process = await getOrCreateProcess(userId);
   const serialized = {
     debilidades: JSON.stringify(data.debilidades),
@@ -472,12 +471,28 @@ export async function saveDofa(userId: number, data: { debilidades: string[]; op
     fortalezas: JSON.stringify(data.fortalezas),
     amenazas: JSON.stringify(data.amenazas),
   };
-
   const existing = await db.select().from(dofaMatrix).where(eq(dofaMatrix.processId, process.id)).limit(1);
   if (existing.length === 0) {
     await db.insert(dofaMatrix).values({ processId: process.id, ...serialized });
+    await writeAuditLog(
+      "dofaMatrix", process.id, "create", null, data,
+      `Creó la matriz DOFA (${data.debilidades.length} debilidades, ${data.fortalezas.length} fortalezas, ${data.oportunidades.length} oportunidades, ${data.amenazas.length} amenazas)`,
+      { ...ctx, processId: ctx.processId ?? process.id, processName: ctx.processName ?? process.processName ?? "Proceso" }
+    );
   } else {
+    const oldRecord = existing[0];
+    const oldData = {
+      debilidades: JSON.parse(oldRecord.debilidades || "[]"),
+      oportunidades: JSON.parse(oldRecord.oportunidades || "[]"),
+      fortalezas: JSON.parse(oldRecord.fortalezas || "[]"),
+      amenazas: JSON.parse(oldRecord.amenazas || "[]"),
+    };
     await db.update(dofaMatrix).set(serialized).where(eq(dofaMatrix.processId, process.id));
+    await writeAuditLog(
+      "dofaMatrix", process.id, "update", oldData, data,
+      `Actualizó la matriz DOFA`,
+      { ...ctx, processId: ctx.processId ?? process.id, processName: ctx.processName ?? process.processName ?? "Proceso" }
+    );
   }
 }
 

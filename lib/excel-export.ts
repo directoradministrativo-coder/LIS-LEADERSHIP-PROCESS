@@ -314,9 +314,12 @@ export function buildExcelWorkbook(
     const moduleLabels: Record<string, string> = {
       orgHierarchies: "Organigrama",
       orgCollaborators: "Colaboradores",
+      collaboratorFunctions: "Funciones de Colaborador",
       kpis: "KPIs",
+      dofaMatrix: "DOFA",
       processInteractions: "Proveedores/Clientes",
       interactionTasks: "Tareas de Interacción",
+      interactionStrengths: "Fortalezas/Oportunidades",
       projects: "Proyectos",
     };
     const actionLabels: Record<string, string> = {

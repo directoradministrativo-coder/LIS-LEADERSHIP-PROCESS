@@ -143,7 +143,7 @@ export const appRouter = router({
         amenazas: z.array(z.string()),
       }))
       .mutation(({ ctx, input }) => {
-        return db.saveDofa(ctx.user.id, input);
+        return db.saveDofa(ctx.user.id, input, { userId: ctx.user.id, userName: ctx.user.name ?? undefined, userEmail: ctx.user.email ?? undefined });
       }),
   }),
 
