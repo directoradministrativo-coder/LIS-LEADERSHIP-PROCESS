@@ -123,6 +123,8 @@ const LEVEL_LABELS: Record<number, { label: string; color: string }> = {
 function AdminOrgView() {
   const allProcessesQuery = trpc.admin.getAllProcesses.useQuery();
   const [viewMode, setViewMode] = useState<"separado" | "integrado">("separado");
+  const [selectedProcessId, setSelectedProcessId] = useState<number | null>(null);
+  const [showProcessPicker, setShowProcessPicker] = useState(false);
 
   if (allProcessesQuery.isLoading) {
     return (
@@ -145,10 +147,15 @@ function AdminOrgView() {
     );
   }
 
-  // Build integrated view: group all hierarchies by level across all processes
+  // Filter by selected process (or show all)
+  const filteredData = selectedProcessId
+    ? processesData.filter((item: any) => item.process?.id === selectedProcessId)
+    : processesData;
+
+  // Build integrated view: group all hierarchies by level across filtered processes
   const byLevel = useMemo(() => {
     const map: Record<number, { processName: string; areaName: string; hierarchy: any; collaborators: any[] }[]> = {};
-    for (const { process, hierarchies, collaborators } of processesData) {
+    for (const { process, hierarchies, collaborators } of filteredData) {
       for (const h of hierarchies) {
         if (!map[h.level]) map[h.level] = [];
         map[h.level].push({
@@ -160,13 +167,17 @@ function AdminOrgView() {
       }
     }
     return map;
-  }, [processesData]);
+  }, [filteredData]);
 
   const levelKeys = Object.keys(byLevel).map(Number).sort((a, b) => a - b);
 
+  const selectedProcessName = selectedProcessId
+    ? (processesData.find((item: any) => item.process?.id === selectedProcessId) as any)?.process?.processName ?? "Proceso"
+    : null;
+
   return (
     <View style={{ flex: 1 }}>
-      {/* View Mode Toggle */}
+      {/* View Mode Toggle + Process Filter */}
       <View style={styles.viewModeBar}>
         <TouchableOpacity
           style={[styles.viewModeBtn, viewMode === "separado" && styles.viewModeBtnActive]}
@@ -188,9 +199,37 @@ function AdminOrgView() {
         </TouchableOpacity>
       </View>
 
+      {/* Process Filter Bar */}
+      <View style={styles.filterBar}>
+        <MaterialIcons name="filter-list" size={16} color="#6B7280" />
+        <Text style={styles.filterLabel}>Filtrar:</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+          <TouchableOpacity
+            style={[styles.filterChip, !selectedProcessId && styles.filterChipActive]}
+            onPress={() => setSelectedProcessId(null)}
+          >
+            <Text style={[styles.filterChipText, !selectedProcessId && styles.filterChipTextActive]}>Todos</Text>
+          </TouchableOpacity>
+          {processesData.map((item: any) => {
+            const pid = item.process?.id;
+            const pname = item.process?.processName || item.process?.areaName || `Proceso ${pid}`;
+            const isActive = selectedProcessId === pid;
+            return (
+              <TouchableOpacity
+                key={pid}
+                style={[styles.filterChip, isActive && styles.filterChipActive]}
+                onPress={() => setSelectedProcessId(isActive ? null : pid)}
+              >
+                <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]} numberOfLines={1}>{pname}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
       {viewMode === "separado" ? (
         <ScrollView style={styles.adminScrollView} showsVerticalScrollIndicator={false}>
-          {processesData.map(({ process, user, hierarchies, collaborators }) => {
+          {filteredData.map(({ process, user, hierarchies, collaborators }: any) => {
             if (!process.processName || hierarchies.length === 0) return null;
             const sortedHierarchies = [...hierarchies].sort((a, b) => a.level - b.level);
             return (
@@ -756,5 +795,44 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     textTransform: "uppercase",
     letterSpacing: 0.5,
+  },
+  filterBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "#F9FAFB",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+    gap: 6,
+  },
+  filterLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#6B7280",
+    marginRight: 4,
+  },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    marginRight: 6,
+  },
+  filterChipActive: {
+    backgroundColor: "#CC2229",
+    borderColor: "#CC2229",
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#374151",
+    maxWidth: 120,
+  },
+  filterChipTextActive: {
+    color: "#FFFFFF",
+    fontWeight: "700",
   },
 });

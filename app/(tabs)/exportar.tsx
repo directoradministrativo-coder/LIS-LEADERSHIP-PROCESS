@@ -68,7 +68,16 @@ export default function ExportarScreen() {
 
   const totalItems = Object.values(stats).reduce((a, b) => a + b, 0);
 
-  const allProcesses = allProcessesQuery.data ?? [];
+  // getAllProcessesData returns [{process, user, hierarchies, collaborators, kpis, dofa, interactions}]
+  // We flatten for easy access in the UI
+  const allProcesses = (allProcessesQuery.data ?? []).map((item: any) => ({
+    id: item.process?.id ?? item.id,
+    processName: item.process?.processName ?? item.processName ?? "",
+    areaName: item.process?.areaName ?? item.areaName ?? "",
+    updatedAt: item.process?.updatedAt ?? item.updatedAt,
+    responsibleName: item.user?.name ?? item.responsibleName ?? "",
+    _raw: item,
+  }));
 
   const toggleProcessSelection = (id: number) => {
     setSelectedProcessIds(prev =>

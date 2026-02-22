@@ -8,6 +8,7 @@ import "react-native-reanimated";
 import { Platform } from "react-native";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
+import * as NavigationBar from "expo-navigation-bar";
 import {
   SafeAreaFrameContext,
   SafeAreaInsetsContext,
@@ -37,6 +38,14 @@ export default function RootLayout() {
   // Initialize Manus runtime for cookie injection from parent container
   useEffect(() => {
     initManusRuntime();
+  }, []);
+
+  // Configure Android navigation bar to match app theme (edge-to-edge)
+  useEffect(() => {
+    if (Platform.OS === "android") {
+      NavigationBar.setBackgroundColorAsync("#FFFFFF");
+      NavigationBar.setButtonStyleAsync("dark");
+    }
   }, []);
 
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {

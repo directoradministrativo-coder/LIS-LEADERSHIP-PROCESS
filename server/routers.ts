@@ -245,7 +245,7 @@ export const appRouter = router({
   admin: router({
     // Get all authorized users (admin only)
     listAuthorizedUsers: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new Error("UNAUTHORIZED");
+      if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
       return db.getAuthorizedUsers();
     }),
     createAuthorizedUser: protectedProcedure
@@ -273,12 +273,12 @@ export const appRouter = router({
     deleteAuthorizedUser: protectedProcedure
       .input(z.object({ id: z.number() }))
       .mutation(async ({ ctx, input }) => {
-        if (ctx.user.role !== "admin") throw new Error("UNAUTHORIZED");
+        if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
         return db.deleteAuthorizedUser(input.id);
       }),
     // Get all processes data for admin view
     getAllProcesses: protectedProcedure.query(async ({ ctx }) => {
-      if (ctx.user.role !== "admin") throw new Error("UNAUTHORIZED");
+      if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
       return db.getAllProcessesData();
     }),
     // Get all projects across all areas (admin only)

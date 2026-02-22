@@ -363,3 +363,11 @@
 - [x] Organigrama: botón editar descripción de función de colaborador (endpoint collaboratorFunction.update existe)
 - [x] Interacciones: botón editar tarea ya creada (endpoint interactionTask.update existe)
 - [x] Interacciones: botón editar fortaleza/oportunidad (endpoint interactionStrength.update agregado)
+
+## Ajustes pendientes v20
+
+- [x] Ajuste 3: Teclado no tapa formularios (KeyboardAvoidingView en todos los modales)
+- [x] Ajuste 4: Barra inferior Android no tapa contenido de la app
+- [x] Ajuste 6: Organigrama admin — filtro por proceso funcional
+- [x] Ajuste 10: Exportar reporte — procesos aparecen como "Sin nombre" en modo Todos y Seleccionar
+- [x] Ajuste 11: Vista Organigrama admin (superadmin) no muestra organigramas de otros procesos (aparece "Sin procesos registrados")

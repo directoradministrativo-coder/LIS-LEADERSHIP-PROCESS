@@ -10,6 +10,7 @@ import {
   Alert,
   Modal,
   Platform,
+  KeyboardAvoidingView,
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { trpc } from "@/lib/trpc";
@@ -414,6 +415,11 @@ export default function AdminProgresoScreen() {
 
       {/* Deadline Modal */}
       <Modal visible={showDeadlineModal} animationType="slide" transparent>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
+        >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Configurar Fecha Límite</Text>
@@ -473,6 +479,7 @@ export default function AdminProgresoScreen() {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </ScreenContainer>
   );

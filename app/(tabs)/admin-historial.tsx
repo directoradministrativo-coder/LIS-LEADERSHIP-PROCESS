@@ -11,6 +11,8 @@ import {
   RefreshControl,
   StyleSheet,
   TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { trpc } from "@/lib/trpc";
@@ -669,6 +671,11 @@ export default function AdminHistorialScreen() {
         transparent
         onRequestClose={() => setDatePickerMode(null)}
       >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
+        >
         <View style={styles.modalOverlay}>
           <View style={[styles.pickerContainer, { backgroundColor: colors.surface, padding: 20 }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
@@ -768,6 +775,7 @@ export default function AdminHistorialScreen() {
             </View>
           </View>
         </View>
+        </KeyboardAvoidingView>
       </Modal>
     </ScreenContainer>
   );
