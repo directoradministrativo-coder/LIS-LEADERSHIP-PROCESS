@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import path from "path";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
@@ -54,6 +55,10 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+  // Serve static files from dist/public (Expo web export)
+  const staticPath = path.join(process.cwd(), "dist", "public");
+  app.use(express.static(staticPath));
+
   registerOAuthRoutes(app);
 
   app.get("/api/health", (_req, res) => {
@@ -67,6 +72,15 @@ async function startServer() {
       createContext,
     }),
   );
+
+  // Serve index.html for all other routes (SPA fallback)
+  app.get("*", (_req, res) => {
+    res.sendFile(path.join(staticPath, "index.html"), (err) => {
+      if (err) {
+        res.status(404).json({ error: "Not found" });
+      }
+    });
+  });
 
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = await findAvailablePort(preferredPort);
