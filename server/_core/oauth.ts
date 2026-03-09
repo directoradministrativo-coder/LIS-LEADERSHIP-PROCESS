@@ -135,8 +135,43 @@ export function registerOAuthRoutes(app: Express) {
   });
 
   // Get current authenticated user - works with both cookie (web) and Bearer token (mobile)
+  // Supports both local JWT tokens and Manus OAuth tokens
   app.get("/api/auth/me", async (req: Request, res: Response) => {
     try {
+      // Extract token from Authorization header or cookie
+      const { verifyLocalSessionToken } = await import("./auth-local");
+      const { getDb } = await import("../db");
+      const { users: usersTable } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      const { parse: parseCookieHeader } = await import("cookie");
+      const { COOKIE_NAME } = await import("../../shared/const.js");
+
+      let token: string | undefined;
+      const authHeader = req.headers.authorization || req.headers.Authorization;
+      if (typeof authHeader === "string" && authHeader.startsWith("Bearer ")) {
+        token = authHeader.slice("Bearer ".length).trim();
+      } else if (req.headers.cookie) {
+        const parsed = parseCookieHeader(req.headers.cookie);
+        token = parsed[COOKIE_NAME];
+      }
+
+      if (token) {
+        // Try local JWT first
+        const payload = await verifyLocalSessionToken(token);
+        if (payload) {
+          const db = await getDb();
+          if (db) {
+            const result = await db.select().from(usersTable).where(eq(usersTable.id, payload.userId)).limit(1);
+            if (result.length > 0) {
+              const user = result[0];
+              res.json({ user: buildUserResponse(user) });
+              return;
+            }
+          }
+        }
+      }
+
+      // Fall back to Manus OAuth
       const user = await sdk.authenticateRequest(req);
       res.json({ user: buildUserResponse(user) });
     } catch (error) {
