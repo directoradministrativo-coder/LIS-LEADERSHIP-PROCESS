@@ -503,3 +503,20 @@
 - [x] Aplicado a TODOS los cases de UPDATE en restoreAuditRecord (kpis, projects, orgCollaborators, orgHierarchies, interactionTasks, interactionStrengths, collaboratorFunctions, processInteractions)
 - [x] Aplicado a TODOS los cases de DELETE (insert) en restoreAuditRecord con cast as any para compatibilidad de tipos
 - [x] Corregidas variables no definidas (cId → collabId, iId → interactionId) en cases de orgCollaborators y processInteractions
+
+## Sincronización APK + PWA (Base de datos compartida en la nube)
+
+- [x] Migrar datos del Excel exportado (5 usuarios) a TiDB
+- [x] Conectar APK a TiDB (reemplazar AsyncStorage con llamadas a la API del servidor)
+- [x] Corregir login en Railway PWA (bug de cookie de sesión) — Fix: usar localStorage + Bearer token en web
+- [ ] Verificar que APK y PWA comparten los mismos datos en tiempo real
+- [ ] Compilar nuevo APK y desplegar PWA actualizada en Railway
+
+## Fix v32 — Autenticación PWA Railway (localStorage + Bearer token)
+
+- [x] lib/_core/auth.ts: getSessionToken/setSessionToken/removeSessionToken usan localStorage en web
+- [x] lib/_core/api.ts: apiCall envía Authorization Bearer en TODAS las plataformas incluyendo web
+- [x] hooks/use-auth.ts: flujo unificado de auth por token para todas las plataformas
+- [x] app/login.tsx: guarda el token JWT en todas las plataformas incluyendo web
+- [x] Bundle web reconstruido con los cambios y pusheado a GitHub
+- [ ] Verificar deploy en Railway (pendiente por incidente en Railway)
