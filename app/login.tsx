@@ -71,8 +71,8 @@ export default function LoginScreen() {
         };
         await Auth.setUserInfo(userInfo);
 
-        // For native: store the session token
-        if (Platform.OS !== "web" && result.sessionToken) {
+        // Store the session token for all platforms (web uses localStorage, native uses SecureStore)
+        if (result.sessionToken) {
           await Auth.setSessionToken(result.sessionToken);
         }
 
