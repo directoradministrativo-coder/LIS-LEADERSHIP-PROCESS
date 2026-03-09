@@ -1,0 +1,1 @@
+ALTER TABLE `authorizedUsers` ADD `passwordHash` varchar(255);

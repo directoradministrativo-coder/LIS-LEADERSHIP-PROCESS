@@ -71,6 +71,13 @@
       "when": 1771794397121,
       "tag": "0009_even_hedge_knight",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1773058232089,
+      "tag": "0010_bored_thor_girl",
+      "breakpoints": true
     }
   ]
 }

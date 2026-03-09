@@ -116,6 +116,21 @@ export async function exchangeOAuthCode(
   };
 }
 
+// Login con email + contraseña (sistema propio, sin OAuth)
+export async function loginWithPassword(
+  email: string,
+  password: string,
+): Promise<{ user: any; sessionToken?: string }> {
+  const result = await apiCall<{ success: boolean; user: any; app_session_id?: string }>(
+    "/api/auth/login",
+    {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    },
+  );
+  return { user: result.user, sessionToken: result.app_session_id };
+}
+
 // Logout
 export async function logout(): Promise<void> {
   await apiCall<void>("/api/auth/logout", {

@@ -184,6 +184,7 @@ export const authorizedUsers = mysqlTable("authorizedUsers", {
   name: varchar("name", { length: 255 }).notNull(),
   areaName: varchar("areaName", { length: 255 }),
   role: mysqlEnum("role", ["user", "admin", "superadmin"]).default("user").notNull(),
+  passwordHash: varchar("passwordHash", { length: 255 }),
   isEnrolled: boolean("isEnrolled").default(false).notNull(),
   enrolledAt: timestamp("enrolledAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

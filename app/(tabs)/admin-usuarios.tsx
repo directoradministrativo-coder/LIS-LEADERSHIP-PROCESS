@@ -53,6 +53,9 @@ export default function AdminUsuariosScreen() {
   const [csvText, setCsvText] = useState("");
   const [formErrors, setFormErrors] = useState<string[]>([]);
   const [importing, setImporting] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ email: "", password: "", confirm: "" });
+  const [passwordError, setPasswordError] = useState("");
 
   const usersQuery = trpc.admin.listAuthorizedUsers.useQuery();
 
@@ -74,6 +77,19 @@ export default function AdminUsuariosScreen() {
 
   const updateUser = trpc.admin.updateAuthorizedUser.useMutation({
     onSuccess: () => usersQuery.refetch(),
+  });
+
+  const setPassword = trpc.admin.setUserPassword.useMutation({
+    onSuccess: () => {
+      toast({ type: "success", message: "Contraseña establecida correctamente" });
+      setShowPasswordModal(false);
+      setPasswordForm({ email: "", password: "", confirm: "" });
+      setPasswordError("");
+      usersQuery.refetch();
+    },
+    onError: (err) => {
+      setPasswordError(err.message);
+    },
   });
 
   const validateForm = (): boolean => {
@@ -273,12 +289,20 @@ export default function AdminUsuariosScreen() {
                   </Text>
                 </View>
               </View>
-              <TouchableOpacity
-                style={styles.deleteBtn}
-                onPress={() => handleDelete(item.id, item.name)}
-              >
-                <MaterialIcons name="delete-outline" size={20} color="#EF4444" />
-              </TouchableOpacity>
+              <View style={{ flexDirection: "column", gap: 4 }}>
+                <TouchableOpacity
+                  style={styles.deleteBtn}
+                  onPress={() => handleDelete(item.id, item.name)}
+                >
+                  <MaterialIcons name="delete-outline" size={20} color="#EF4444" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.deleteBtn, { backgroundColor: item.isEnrolled ? "#EFF6FF" : "#FFF7ED" }]}
+                  onPress={() => { setPasswordForm({ email: item.email, password: "", confirm: "" }); setPasswordError(""); setShowPasswordModal(true); }}
+                >
+                  <MaterialIcons name="lock" size={18} color={item.isEnrolled ? "#1B4F9B" : "#F5A623"} />
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         />
@@ -317,6 +341,62 @@ export default function AdminUsuariosScreen() {
           </View>
           <TouchableOpacity style={[styles.saveBtn, createUser.isPending && styles.saveBtnDisabled]} onPress={handleSave} disabled={createUser.isPending}>
             {createUser.isPending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.saveBtnText}>Guardar Usuario</Text>}
+          </TouchableOpacity>
+        </View>
+      </KeyboardModal>
+
+      {/* Set Password Modal */}
+      <KeyboardModal
+        visible={showPasswordModal}
+        onClose={() => { setShowPasswordModal(false); setPasswordForm({ email: "", password: "", confirm: "" }); setPasswordError(""); }}
+        title="Establecer Contraseña"
+      >
+        <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
+          <View style={styles.csvFormatBox}>
+            <Text style={styles.csvFormatTitle}>🔐 Asignar contraseña de acceso</Text>
+            <Text style={[styles.csvFormatCode, { color: "#374151" }]}>{passwordForm.email}</Text>
+          </View>
+          {passwordError ? (
+            <View style={styles.errorBox}>
+              <MaterialIcons name="error-outline" size={16} color="#CC2229" />
+              <Text style={[styles.errorItem, { flex: 1 }]}>{passwordError}</Text>
+            </View>
+          ) : null}
+          <Text style={styles.fieldLabel}>Nueva contraseña <Text style={styles.required}>*</Text></Text>
+          <TextInput
+            style={styles.input}
+            value={passwordForm.password}
+            onChangeText={v => setPasswordForm(p => ({ ...p, password: v }))}
+            placeholder="Mínimo 6 caracteres"
+            placeholderTextColor="#9CA3AF"
+            secureTextEntry
+          />
+          <Text style={styles.fieldLabel}>Confirmar contraseña <Text style={styles.required}>*</Text></Text>
+          <TextInput
+            style={styles.input}
+            value={passwordForm.confirm}
+            onChangeText={v => setPasswordForm(p => ({ ...p, confirm: v }))}
+            placeholder="Repite la contraseña"
+            placeholderTextColor="#9CA3AF"
+            secureTextEntry
+          />
+          <TouchableOpacity
+            style={[styles.saveBtn, setPassword.isPending && styles.saveBtnDisabled]}
+            onPress={() => {
+              if (!passwordForm.password || passwordForm.password.length < 6) {
+                setPasswordError("La contraseña debe tener al menos 6 caracteres");
+                return;
+              }
+              if (passwordForm.password !== passwordForm.confirm) {
+                setPasswordError("Las contraseñas no coinciden");
+                return;
+              }
+              setPasswordError("");
+              setPassword.mutate({ email: passwordForm.email, password: passwordForm.password });
+            }}
+            disabled={setPassword.isPending}
+          >
+            {setPassword.isPending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.saveBtnText}>Guardar Contraseña</Text>}
           </TouchableOpacity>
         </View>
       </KeyboardModal>

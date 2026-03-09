@@ -355,6 +355,22 @@ export const appRouter = router({
         if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
         return db.deleteInteraction(input.id, { userId: ctx.user.id, userName: ctx.user.name ?? undefined, userEmail: ctx.user.email ?? undefined });
       }),
+    // Admin: set password for an authorized user
+    setUserPassword: protectedProcedure
+      .input(z.object({ email: z.string().email(), password: z.string().min(6) }))
+      .mutation(async ({ ctx, input }) => {
+        if (ctx.user.role !== "admin" && ctx.user.role !== "superadmin") throw new Error("UNAUTHORIZED");
+        const bcrypt = await import("bcryptjs");
+        const passwordHash = await bcrypt.hash(input.password, 10);
+        const authUser = await db.getAuthorizedUserByEmail(input.email);
+        if (!authUser) throw new Error("Usuario no encontrado");
+        const dbConn = await db.getDb();
+        if (!dbConn) throw new Error("Database not available");
+        const { authorizedUsers: authUsersTable } = await import("../drizzle/schema");
+        const { eq } = await import("drizzle-orm");
+        await dbConn.update(authUsersTable).set({ passwordHash, isEnrolled: true, enrolledAt: new Date() }).where(eq(authUsersTable.id, authUser.id));
+        return { success: true };
+      }),
   }),
 
   // Process Notifications
